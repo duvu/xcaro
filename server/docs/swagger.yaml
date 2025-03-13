@@ -1,0 +1,227 @@
+basePath: /api
+definitions:
+  models.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      username:
+        maxLength: 30
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  models.Role:
+    enum:
+    - admin
+    - mod
+    - player
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleMod
+    - RolePlayer
+  models.UpdateProfileRequest:
+    properties:
+      avatar:
+        type: string
+      bio:
+        maxLength: 500
+        type: string
+      date_of_birth:
+        type: string
+      full_name:
+        maxLength: 100
+        type: string
+      phone_number:
+        type: string
+    type: object
+  models.User:
+    properties:
+      avatar:
+        type: string
+      ban_reason:
+        type: string
+      bio:
+        type: string
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      games_played:
+        type: integer
+      games_won:
+        type: integer
+      id:
+        type: string
+      is_banned:
+        type: boolean
+      phone_number:
+        type: string
+      rating:
+        type: integer
+      role:
+        $ref: '#/definitions/models.Role'
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@xcaro.com
+    name: API Support
+    url: http://www.swagger.io/support
+  description: API cho game cờ caro online với tính năng chat và voice/video call.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: XCaro Game API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Đăng nhập với username và password
+      parameters:
+      - description: Thông tin đăng nhập
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: user và token
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Đăng nhập
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Tạo tài khoản mới với username và password
+      parameters:
+      - description: Thông tin đăng ký
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: user và token
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Đăng ký tài khoản mới
+      tags:
+      - auth
+  /profile:
+    get:
+      description: Lấy thông tin chi tiết của người dùng hiện tại
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Lấy thông tin profile
+      tags:
+      - profile
+    put:
+      consumes:
+      - application/json
+      description: Cập nhật thông tin cá nhân của người dùng
+      parameters:
+      - description: Thông tin cập nhật
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Cập nhật profile
+      tags:
+      - profile
+schemes:
+- http
+- https
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
