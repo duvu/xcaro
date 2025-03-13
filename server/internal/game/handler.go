@@ -1,7 +1,10 @@
 package game
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/duvu/xcaro/server/internal/ws"
 	"github.com/duvu/xcaro/server/pkg/models"
@@ -213,7 +216,21 @@ func (h *Handler) ListGames(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement
+	// Set giá trị mặc định cho phân trang
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+
+	games, err := h.service.ListGames(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, games)
 }
 
 // GetGameHistory godoc
@@ -236,7 +253,21 @@ func (h *Handler) GetGameHistory(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement
+	// Set giá trị mặc định cho phân trang
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+
+	games, err := h.service.GetGameHistory(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, games)
 }
 
 // GetGameStats godoc
@@ -256,5 +287,165 @@ func (h *Handler) GetGameStats(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement
-} 
+	stats, err := h.service.GetGameStats(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// ReplayGame godoc
+// @Summary Xem lại game đến một nước đi cụ thể
+// @Description Xem lại game đến một nước đi cụ thể
+// @Tags games
+// @Accept json
+// @Produce json
+// @Param game_id path string true "Game ID"
+// @Param step query int false "Số nước đi muốn xem"
+// @Success 200 {object} models.Game
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Router /api/games/{game_id}/replay [get]
+func (h *Handler) ReplayGame(c *gin.Context) {
+	gameID := c.Param("game_id")
+	step, _ := strconv.Atoi(c.DefaultQuery("step", "0"))
+
+	req := &models.ReplayGameRequest{
+		GameID: gameID,
+		Step:   step,
+	}
+
+	game, err := h.service.ReplayGame(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, game)
+}
+
+// GetLeaderboard godoc
+// @Summary Lấy bảng xếp hạng người chơi
+// @Description Lấy bảng xếp hạng người chơi theo tỷ lệ thắng
+// @Tags games
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.LeaderboardEntry
+// @Failure 400 {object} models.ErrorResponse
+// @Router /api/games/leaderboard [get]
+func (h *Handler) GetLeaderboard(c *gin.Context) {
+	entries, err := h.service.GetLeaderboard(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, entries)
+}
+
+// SearchGames godoc
+// @Summary Tìm kiếm game theo các tiêu chí
+// @Description Tìm kiếm game theo khoảng thời gian và trạng thái
+// @Tags games
+// @Accept json
+// @Produce json
+// @Param start_date query string true "Ngày bắt đầu (RFC3339)"
+// @Param end_date query string true "Ngày kết thúc (RFC3339)"
+// @Param status query string false "Trạng thái game"
+// @Param page query int false "Số trang"
+// @Param limit query int false "Số game mỗi trang"
+// @Success 200 {array} models.Game
+// @Failure 400 {object} models.ErrorResponse
+// @Router /api/games/search [get]
+func (h *Handler) SearchGames(c *gin.Context) {
+	startDate, err := time.Parse(time.RFC3339, c.Query("start_date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Ngày bắt đầu không hợp lệ"})
+		return
+	}
+
+	endDate, err := time.Parse(time.RFC3339, c.Query("end_date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Ngày kết thúc không hợp lệ"})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	req := &models.SearchGamesRequest{
+		StartDate: startDate,
+		EndDate:   endDate,
+		Status:    c.Query("status"),
+		Page:      page,
+		Limit:     limit,
+	}
+
+	games, err := h.service.SearchGames(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, games)
+}
+
+// ExportGameHistory godoc
+// @Summary Xuất lịch sử game
+// @Description Xuất lịch sử game của người dùng theo định dạng JSON hoặc CSV
+// @Tags games
+// @Accept json
+// @Produce json
+// @Param user_id query string true "User ID"
+// @Param start_date query string true "Ngày bắt đầu (RFC3339)"
+// @Param end_date query string true "Ngày kết thúc (RFC3339)"
+// @Param format query string true "Định dạng xuất (json/csv)"
+// @Success 200 {string} string
+// @Failure 400 {object} models.ErrorResponse
+// @Router /api/games/export [get]
+func (h *Handler) ExportGameHistory(c *gin.Context) {
+	startDate, err := time.Parse(time.RFC3339, c.Query("start_date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Ngày bắt đầu không hợp lệ"})
+		return
+	}
+
+	endDate, err := time.Parse(time.RFC3339, c.Query("end_date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Ngày kết thúc không hợp lệ"})
+		return
+	}
+
+	format := c.Query("format")
+	if format != "json" && format != "csv" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Định dạng không được hỗ trợ"})
+		return
+	}
+
+	req := &models.ExportHistoryRequest{
+		UserID:    c.Query("user_id"),
+		StartDate: startDate,
+		EndDate:   endDate,
+		Format:    format,
+	}
+
+	data, err := h.service.ExportGameHistory(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Set content type và filename
+	contentType := "application/json"
+	filename := "game_history.json"
+	if format == "csv" {
+		contentType = "text/csv"
+		filename = "game_history.csv"
+	}
+
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Data(http.StatusOK, contentType, data)
+}

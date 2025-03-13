@@ -2,7 +2,10 @@ package game
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/duvu/xcaro/server/internal/ws"
@@ -265,4 +268,383 @@ func (s *Service) GetGame(ctx context.Context, gameID primitive.ObjectID) (*mode
 		return nil, err
 	}
 	return &game, nil
-} 
+}
+
+// ListGames lấy danh sách game với các bộ lọc
+func (s *Service) ListGames(ctx context.Context, req *models.ListGamesRequest) ([]*models.Game, error) {
+	// Xây dựng query
+	query := bson.M{}
+	if req.Status != "" {
+		query["status"] = models.GameStatus(req.Status)
+	}
+
+	// Tính toán skip và limit cho phân trang
+	skip := (req.Page - 1) * req.Limit
+	if skip < 0 {
+		skip = 0
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10 // Mặc định 10 game mỗi trang
+	}
+
+	// Thực hiện query
+	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
+		SetSkip(skip).
+		SetLimit(req.Limit).
+		SetSort(bson.D{{"created_at", -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var games []*models.Game
+	if err := cursor.All(ctx, &games); err != nil {
+		return nil, err
+	}
+
+	return games, nil
+}
+
+// GetGameHistory lấy lịch sử game của người dùng
+func (s *Service) GetGameHistory(ctx context.Context, req *models.GetGameHistoryRequest) ([]*models.Game, error) {
+	// Chuyển đổi userID sang ObjectID
+	userID, err := primitive.ObjectIDFromHex(req.UserID)
+	if err != nil {
+		return nil, errors.New("user ID không hợp lệ")
+	}
+
+	// Xây dựng query
+	query := bson.M{
+		"$or": []bson.M{
+			{"player1_id": userID},
+			{"player2_id": userID},
+		},
+	}
+	if req.Status != "" {
+		query["status"] = models.GameStatus(req.Status)
+	}
+
+	// Tính toán skip và limit cho phân trang
+	skip := (req.Page - 1) * req.Limit
+	if skip < 0 {
+		skip = 0
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10 // Mặc định 10 game mỗi trang
+	}
+
+	// Thực hiện query
+	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
+		SetSkip(skip).
+		SetLimit(req.Limit).
+		SetSort(bson.D{{"created_at", -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var games []*models.Game
+	if err := cursor.All(ctx, &games); err != nil {
+		return nil, err
+	}
+
+	return games, nil
+}
+
+// GetGameStats lấy thống kê game của người dùng
+func (s *Service) GetGameStats(ctx context.Context, req *models.GetGameStatsRequest) (*models.GameStats, error) {
+	// Chuyển đổi userID sang ObjectID
+	userID, err := primitive.ObjectIDFromHex(req.UserID)
+	if err != nil {
+		return nil, errors.New("user ID không hợp lệ")
+	}
+
+	// Xây dựng pipeline cho aggregation
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"$or": []bson.M{
+					{"player1_id": userID},
+					{"player2_id": userID},
+				},
+				"status": models.GameStatusFinished,
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id":         nil,
+				"total_games": bson.M{"$sum": 1},
+				"wins": bson.M{
+					"$sum": bson.M{
+						"$cond": []interface{}{
+							bson.M{"$eq": []interface{}{"$winner", userID}},
+							1,
+							0,
+						},
+					},
+				},
+				"losses": bson.M{
+					"$sum": bson.M{
+						"$cond": []interface{}{
+							bson.M{
+								"$and": []bson.M{
+									{"$ne": []interface{}{"$winner", nil}},
+									{"$ne": []interface{}{"$winner", userID}},
+								},
+							},
+							1,
+							0,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Thực hiện aggregation
+	cursor, err := s.db.Collection("games").Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var result []bson.M
+	if err := cursor.All(ctx, &result); err != nil {
+		return nil, err
+	}
+
+	// Xử lý kết quả
+	stats := &models.GameStats{
+		UserID:    req.UserID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if len(result) > 0 {
+		stats.TotalGames = int(result[0]["total_games"].(int32))
+		stats.Wins = int(result[0]["wins"].(int32))
+		stats.Losses = int(result[0]["losses"].(int32))
+		stats.Draws = stats.TotalGames - stats.Wins - stats.Losses
+
+		if stats.TotalGames > 0 {
+			stats.WinRate = float64(stats.Wins) / float64(stats.TotalGames) * 100
+		}
+	}
+
+	return stats, nil
+}
+
+// ReplayGame xem lại game đến một nước đi cụ thể
+func (s *Service) ReplayGame(ctx context.Context, req *models.ReplayGameRequest) (*models.Game, error) {
+	// Chuyển đổi gameID sang ObjectID
+	gameID, err := primitive.ObjectIDFromHex(req.GameID)
+	if err != nil {
+		return nil, errors.New("game ID không hợp lệ")
+	}
+
+	// Lấy game từ database
+	game, err := s.GetGame(ctx, gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tạo bản sao của game để replay
+	replayGame := *game
+	replayGame.Board = make([][]string, BoardSize)
+	for i := range replayGame.Board {
+		replayGame.Board[i] = make([]string, BoardSize)
+	}
+
+	// Áp dụng các nước đi đến bước được yêu cầu
+	if req.Step > 0 && req.Step <= len(game.Moves) {
+		for i := 0; i < req.Step; i++ {
+			move := game.Moves[i]
+			replayGame.Board[move.Row][move.Col] = move.Symbol
+		}
+		replayGame.Moves = game.Moves[:req.Step]
+	}
+
+	return &replayGame, nil
+}
+
+// GetLeaderboard lấy bảng xếp hạng người chơi
+func (s *Service) GetLeaderboard(ctx context.Context) ([]*models.LeaderboardEntry, error) {
+	// Pipeline để tính toán thống kê cho mỗi người chơi
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"status": models.GameStatusFinished,
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id":        "$winner",
+				"total_wins": bson.M{"$sum": 1},
+				"total_games": bson.M{
+					"$sum": bson.M{
+						"$cond": []interface{}{
+							bson.M{
+								"$or": []bson.M{
+									{"$eq": []interface{}{"$player1_id", "$winner"}},
+									{"$eq": []interface{}{"$player2_id", "$winner"}},
+								},
+							},
+							1,
+							0,
+						},
+					},
+				},
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "users",
+				"localField":   "_id",
+				"foreignField": "_id",
+				"as":           "user",
+			},
+		},
+		{
+			"$unwind": "$user",
+		},
+		{
+			"$project": bson.M{
+				"user_id":    "$_id",
+				"username":   "$user.username",
+				"total_wins": 1,
+				"win_rate": bson.M{
+					"$multiply": []interface{}{
+						bson.M{"$divide": []interface{}{"$total_wins", "$total_games"}},
+						100,
+					},
+				},
+			},
+		},
+		{
+			"$sort": bson.M{"win_rate": -1, "total_wins": -1},
+		},
+	}
+
+	// Thực hiện aggregation
+	cursor, err := s.db.Collection("games").Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var entries []*models.LeaderboardEntry
+	if err := cursor.All(ctx, &entries); err != nil {
+		return nil, err
+	}
+
+	// Thêm rank cho mỗi entry
+	for i, entry := range entries {
+		entry.Rank = i + 1
+	}
+
+	return entries, nil
+}
+
+// SearchGames tìm kiếm game theo các tiêu chí
+func (s *Service) SearchGames(ctx context.Context, req *models.SearchGamesRequest) ([]*models.Game, error) {
+	// Xây dựng query
+	query := bson.M{
+		"created_at": bson.M{
+			"$gte": req.StartDate,
+			"$lte": req.EndDate,
+		},
+	}
+	if req.Status != "" {
+		query["status"] = models.GameStatus(req.Status)
+	}
+
+	// Tính toán skip và limit cho phân trang
+	skip := (req.Page - 1) * req.Limit
+	if skip < 0 {
+		skip = 0
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10 // Mặc định 10 game mỗi trang
+	}
+
+	// Thực hiện query
+	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
+		SetSkip(skip).
+		SetLimit(req.Limit).
+		SetSort(bson.D{{"created_at", -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var games []*models.Game
+	if err := cursor.All(ctx, &games); err != nil {
+		return nil, err
+	}
+
+	return games, nil
+}
+
+// ExportGameHistory xuất lịch sử game
+func (s *Service) ExportGameHistory(ctx context.Context, req *models.ExportHistoryRequest) ([]byte, error) {
+	// Chuyển đổi userID sang ObjectID
+	userID, err := primitive.ObjectIDFromHex(req.UserID)
+	if err != nil {
+		return nil, errors.New("user ID không hợp lệ")
+	}
+
+	// Xây dựng query
+	query := bson.M{
+		"$or": []bson.M{
+			{"player1_id": userID},
+			{"player2_id": userID},
+		},
+		"created_at": bson.M{
+			"$gte": req.StartDate,
+			"$lte": req.EndDate,
+		},
+	}
+
+	// Lấy tất cả game trong khoảng thời gian
+	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
+		SetSort(bson.D{{"created_at", -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var games []*models.Game
+	if err := cursor.All(ctx, &games); err != nil {
+		return nil, err
+	}
+
+	// Chuyển đổi sang định dạng yêu cầu
+	switch req.Format {
+	case "json":
+		return json.Marshal(games)
+	case "csv":
+		// Tạo CSV header
+		var csvData strings.Builder
+		csvData.WriteString("Game ID,Player 1,Player 2,Winner,Status,Created At,Updated At\n")
+
+		// Thêm dữ liệu
+		for _, game := range games {
+			winner := "None"
+			if game.Winner != nil {
+				winner = game.Winner.Hex()
+			}
+			csvData.WriteString(fmt.Sprintf("%s,%s,%s,%s,%s,%s,%s\n",
+				game.ID.Hex(),
+				game.Player1ID.Hex(),
+				game.Player2ID.Hex(),
+				winner,
+				game.Status,
+				game.CreatedAt.Format(time.RFC3339),
+				game.UpdatedAt.Format(time.RFC3339),
+			))
+		}
+		return []byte(csvData.String()), nil
+	default:
+		return nil, errors.New("định dạng không được hỗ trợ")
+	}
+}

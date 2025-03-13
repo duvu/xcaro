@@ -16,24 +16,24 @@ const (
 )
 
 type Game struct {
-	ID        primitive.ObjectID   `json:"id" bson:"_id,omitempty"`
-	Player1ID primitive.ObjectID   `json:"player1_id" bson:"player1_id"`
-	Player2ID primitive.ObjectID   `json:"player2_id,omitempty" bson:"player2_id,omitempty"`
+	ID        primitive.ObjectID  `json:"id" bson:"_id,omitempty"`
+	Player1ID primitive.ObjectID  `json:"player1_id" bson:"player1_id"`
+	Player2ID primitive.ObjectID  `json:"player2_id,omitempty" bson:"player2_id,omitempty"`
 	Board     [][]string          `json:"board" bson:"board"`         // Mảng 2 chiều lưu nước đi ("X", "O", hoặc "")
 	Moves     []Move              `json:"moves" bson:"moves"`         // Lịch sử các nước đi
 	Status    GameStatus          `json:"status" bson:"status"`       // Trạng thái game
 	Winner    *primitive.ObjectID `json:"winner" bson:"winner"`       // ID người thắng (nếu có)
-	NextTurn  primitive.ObjectID   `json:"next_turn" bson:"next_turn"` // ID người chơi tiếp theo
+	NextTurn  primitive.ObjectID  `json:"next_turn" bson:"next_turn"` // ID người chơi tiếp theo
 	CreatedAt time.Time           `json:"created_at" bson:"created_at"`
 	UpdatedAt time.Time           `json:"updated_at" bson:"updated_at"`
 }
 
 type Move struct {
 	PlayerID primitive.ObjectID `json:"player_id" bson:"player_id"`
-	Row      int              `json:"row" bson:"row"`
-	Col      int              `json:"col" bson:"col"`
-	Symbol   string           `json:"symbol" bson:"symbol"` // "X" hoặc "O"
-	Time     time.Time        `json:"time" bson:"time"`
+	Row      int                `json:"row" bson:"row"`
+	Col      int                `json:"col" bson:"col"`
+	Symbol   string             `json:"symbol" bson:"symbol"` // "X" hoặc "O"
+	Time     time.Time          `json:"time" bson:"time"`
 }
 
 type CreateGameRequest struct {
@@ -48,20 +48,20 @@ type JoinGameRequest struct {
 type MakeMoveRequest struct {
 	GameID   primitive.ObjectID `json:"game_id" binding:"required"`
 	PlayerID primitive.ObjectID `json:"player_id" binding:"required"`
-	Row      int              `json:"row" binding:"required"`
-	Col      int              `json:"col" binding:"required"`
+	Row      int                `json:"row" binding:"required"`
+	Col      int                `json:"col" binding:"required"`
 }
 
 // GameStats thống kê về số trận thắng/thua/hòa của người dùng
 type GameStats struct {
-	UserID    string `json:"user_id" bson:"user_id"`
-	Wins      int    `json:"wins" bson:"wins"`
-	Losses    int    `json:"losses" bson:"losses"`
-	Draws     int    `json:"draws" bson:"draws"`
-	TotalGames int   `json:"total_games" bson:"total_games"`
-	WinRate   float64 `json:"win_rate" bson:"win_rate"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+	UserID     string    `json:"user_id" bson:"user_id"`
+	Wins       int       `json:"wins" bson:"wins"`
+	Losses     int       `json:"losses" bson:"losses"`
+	Draws      int       `json:"draws" bson:"draws"`
+	TotalGames int       `json:"total_games" bson:"total_games"`
+	WinRate    float64   `json:"win_rate" bson:"win_rate"`
+	CreatedAt  time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // ListGamesRequest request cho việc lấy danh sách game
@@ -84,6 +84,38 @@ type GetGameStatsRequest struct {
 	UserID string `json:"user_id" form:"user_id" binding:"required"`
 }
 
+// ReplayGameRequest request cho việc xem lại game
+type ReplayGameRequest struct {
+	GameID string `json:"game_id" binding:"required"`
+	Step   int    `json:"step"` // Số nước đi muốn xem
+}
+
+// LeaderboardEntry thông tin người chơi trong bảng xếp hạng
+type LeaderboardEntry struct {
+	UserID    string  `json:"user_id" bson:"user_id"`
+	Username  string  `json:"username" bson:"username"`
+	WinRate   float64 `json:"win_rate" bson:"win_rate"`
+	TotalWins int     `json:"total_wins" bson:"total_wins"`
+	Rank      int     `json:"rank" bson:"rank"`
+}
+
+// SearchGamesRequest request cho việc tìm kiếm game
+type SearchGamesRequest struct {
+	StartDate time.Time `json:"start_date" form:"start_date"`
+	EndDate   time.Time `json:"end_date" form:"end_date"`
+	Status    string    `json:"status" form:"status"`
+	Page      int       `json:"page" form:"page"`
+	Limit     int       `json:"limit" form:"limit"`
+}
+
+// ExportHistoryRequest request cho việc xuất lịch sử game
+type ExportHistoryRequest struct {
+	UserID    string    `json:"user_id" binding:"required"`
+	StartDate time.Time `json:"start_date" binding:"required"`
+	EndDate   time.Time `json:"end_date" binding:"required"`
+	Format    string    `json:"format" binding:"required,oneof=json csv"` // "json" hoặc "csv"
+}
+
 // String chuyển đổi game thành JSON string
 func (g *Game) String() string {
 	bytes, err := json.Marshal(g)
@@ -91,4 +123,4 @@ func (g *Game) String() string {
 		return "{}"
 	}
 	return string(bytes)
-} 
+}
