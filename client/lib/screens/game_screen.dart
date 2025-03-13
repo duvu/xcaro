@@ -54,7 +54,7 @@ class OfflineGameView extends StatelessWidget {
         if (gameProvider.currentGame == null) {
           return Center(
             child: ElevatedButton(
-              onPressed: () => gameProvider.createGame(),
+              onPressed: () => gameProvider.startNewGame(),
               child: const Text('Bắt đầu chơi'),
             ),
           );
@@ -74,18 +74,18 @@ class OfflineGameView extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Text(
-                    'Lượt: ${gameProvider.currentGame!.currentTurn == gameProvider.currentGame!.creator.id ? "X" : "O"}',
+                    'Lượt: ${gameProvider.currentGame!.currentPlayer == gameProvider.currentUser ? "X" : "O"}',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (gameProvider.currentGame!.isFinished)
+                  if (gameProvider.currentGame!.status == 'finished')
                     Text(
                       gameProvider.currentGame!.winner == null
                           ? 'Hòa!'
-                          : 'Người thắng: ${gameProvider.currentGame!.winner == gameProvider.currentGame!.creator.id ? "X" : "O"}',
+                          : 'Người thắng: ${gameProvider.currentGame!.winner == gameProvider.currentUser ? "X" : "O"}',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ElevatedButton(
-                    onPressed: () => gameProvider.createGame(),
+                    onPressed: () => gameProvider.startNewGame(),
                     child: const Text('Chơi lại'),
                   ),
                 ],
@@ -143,14 +143,14 @@ class OnlineGameView extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Text(
-                    'Lượt: ${game.currentTurn == game.creator.id ? "X" : "O"}',
+                    'Lượt: ${game.currentPlayer == game.players[0] ? "X" : "O"}',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (game.isFinished)
+                  if (game.status == 'finished')
                     Text(
                       game.winner == null
                           ? 'Hòa!'
-                          : 'Người thắng: ${game.winner == game.creator.id ? "X" : "O"}',
+                          : 'Người thắng: ${game.winner == game.players[0] ? "X" : "O"}',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ElevatedButton(

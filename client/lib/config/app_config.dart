@@ -1,6 +1,7 @@
 class AppConfig {
-  static const String apiBaseUrl = 'http://localhost:8080/api';
-  static const String wsBaseUrl = 'ws://localhost:8080/ws';
+  // URLs
+  static const String _apiBaseUrl = 'http://10.113.213.9:8080/api';
+  static const String _wsBaseUrl = 'ws://10.113.213.9:8080/api/ws';
 
   // API endpoints
   static const String loginEndpoint = '/auth/login';
@@ -36,6 +37,13 @@ class AppConfig {
 
   // Lấy URL dựa vào môi trường
   static String get baseUrl =>
-      isDevelopment ? apiBaseUrl : productionApiBaseUrl;
-  static String get wsUrl => isDevelopment ? wsBaseUrl : productionWsBaseUrl;
+      isDevelopment ? _apiBaseUrl : productionApiBaseUrl;
+  static String get wsUrl => isDevelopment ? _wsBaseUrl : productionWsBaseUrl;
+
+  // Các cấu hình khác
+  static const int maxUsernameLength = 30;
+  static const int minUsernameLength = 3;
+  static const int minPasswordLength = 6;
+  static const int maxBioLength = 500;
+  static const int maxFullNameLength = 100;
 }

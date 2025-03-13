@@ -5,10 +5,13 @@ import '../models/user.dart';
 import '../services/local_storage_service.dart';
 import '../models/chat_message.dart' as chat;
 import 'package:uuid/uuid.dart';
+import 'package:flutter/material.dart';
 
-class OfflineGameProvider with ChangeNotifier {
+class OfflineGameProvider extends ChangeNotifier {
   final LocalStorageService _storage;
   Game? _currentGame;
+  User? _currentUser;
+  User? _computer;
   bool _isLoading = false;
   String? _error;
   List<List<String>> _board = List.generate(3, (_) => List.filled(3, ''));
@@ -18,9 +21,13 @@ class OfflineGameProvider with ChangeNotifier {
   List<chat.ChatMessage> _messages = [];
   final _uuid = const Uuid();
 
-  OfflineGameProvider(this._storage);
+  OfflineGameProvider(this._storage) {
+    _init();
+  }
 
   Game? get currentGame => _currentGame;
+  User? get currentUser => _currentUser;
+  User? get computer => _computer;
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<List<String>> get board => _board;
@@ -29,198 +36,254 @@ class OfflineGameProvider with ChangeNotifier {
   bool get isGameOver => _isGameOver;
   List<chat.ChatMessage> get messages => _messages;
 
-  // Tạo game mới với máy
-  Future<void> createGame() async {
+  Future<void> _init() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final user = _storage.getUser() ??
-          const User(
-            id: 'user',
-            username: 'Người chơi',
-          );
+      final user = _storage.getUser();
+      if (user != null) {
+        _currentUser = user;
+      } else {
+        _currentUser = User(
+          id: 'offline_user',
+          username: 'Người chơi',
+          email: 'offline@example.com',
+          role: 'player',
+          isBanned: false,
+          gamesPlayed: 0,
+          gamesWon: 0,
+          rating: 1000,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
 
-      final computer = const User(
+      _computer = User(
         id: 'computer',
-        username: 'Máy',
-      );
-
-      _currentGame = Game(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        creator: user,
-        opponent: computer,
-        board: List.generate(15, (_) => List.filled(15, 0)),
-        isFinished: false,
-        currentTurn: user.id,
+        username: 'Máy tính',
+        email: 'computer@example.com',
+        role: 'player',
+        isBanned: false,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        rating: 1000,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
-
-      notifyListeners();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Người chơi đánh
-  Future<void> makeMove(int x, int y) async {
-    if (_currentGame == null ||
-        _currentGame!.isFinished ||
-        _currentGame!.board[x][y] != 0) {
-      return;
-    }
-
-    // Người chơi đánh
-    final newBoard = List<List<int>>.from(
-      _currentGame!.board.map((row) => List<int>.from(row)),
-    );
-    newBoard[x][y] = 1;
-
-    var isFinished = _checkWin(newBoard, x, y, 1);
-    var winner = isFinished ? _currentGame!.creator.id : null;
-
-    if (!isFinished) {
-      // Máy đánh
-      final move = _findBestMove(newBoard);
-      if (move != null) {
-        newBoard[move.$1][move.$2] = 2;
-        isFinished = _checkWin(newBoard, move.$1, move.$2, 2);
-        if (isFinished) {
-          winner = _currentGame!.opponent!.id;
-        }
-      } else {
-        isFinished = true; // Hòa
-      }
-    }
-
+  Future<void> startNewGame() async {
     _currentGame = Game(
-      id: _currentGame!.id,
-      creator: _currentGame!.creator,
-      opponent: _currentGame!.opponent,
-      board: newBoard,
-      isFinished: winner != null || isFinished,
-      winner: winner,
-      currentTurn:
-          winner != null || isFinished ? '' : _currentGame!.currentTurn,
-      createdAt: _currentGame!.createdAt,
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      players: [_currentUser!, _computer!],
+      currentPlayer: _currentUser!,
+      board: List.generate(15, (_) => List.filled(15, '')),
+      status: 'playing',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
-
     notifyListeners();
   }
 
-  bool _checkWin(List<List<int>> board, int x, int y, int player) {
-    // Kiểm tra hàng ngang
-    var count = 0;
-    for (var i = 0; i < board.length; i++) {
-      if (board[x][i] == player) {
-        count++;
-        if (count == 5) return true;
-      } else {
-        count = 0;
-      }
+  Future<void> makeMove(int x, int y) async {
+    if (_currentGame == null || _currentGame!.status != 'playing') return;
+
+    // Kiểm tra lượt chơi
+    if (_currentGame!.currentPlayer != _currentUser) return;
+
+    // Kiểm tra ô đã được đánh chưa
+    if (_currentGame!.board[x][y] != '') return;
+
+    // Đánh cờ
+    final newBoard = List<List<String>>.from(
+      _currentGame!.board.map((row) => List<String>.from(row)),
+    );
+    newBoard[x][y] = 'X';
+
+    _currentGame = Game(
+      id: _currentGame!.id,
+      players: _currentGame!.players,
+      currentPlayer: _computer!,
+      board: newBoard,
+      status: 'playing',
+      createdAt: _currentGame!.createdAt,
+      updatedAt: DateTime.now(),
+    );
+    notifyListeners();
+
+    // Kiểm tra thắng
+    if (_checkWin(x, y)) {
+      _currentGame = Game(
+        id: _currentGame!.id,
+        players: _currentGame!.players,
+        currentPlayer: _currentGame!.currentPlayer,
+        board: _currentGame!.board,
+        status: 'finished',
+        winner: _currentUser,
+        createdAt: _currentGame!.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+      return;
     }
 
-    // Kiểm tra hàng dọc
-    count = 0;
-    for (var i = 0; i < board.length; i++) {
-      if (board[i][y] == player) {
-        count++;
-        if (count == 5) return true;
-      } else {
-        count = 0;
-      }
+    // Kiểm tra hòa
+    if (_checkDraw()) {
+      _currentGame = Game(
+        id: _currentGame!.id,
+        players: _currentGame!.players,
+        currentPlayer: _currentGame!.currentPlayer,
+        board: _currentGame!.board,
+        status: 'finished',
+        createdAt: _currentGame!.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+      return;
     }
 
-    // Kiểm tra đường chéo chính
-    count = 0;
-    var minDiag = min(x, y);
-    var startX = x - minDiag;
-    var startY = y - minDiag;
-    while (startX < board.length && startY < board.length) {
-      if (board[startX][startY] == player) {
-        count++;
-        if (count == 5) return true;
-      } else {
-        count = 0;
-      }
-      startX++;
-      startY++;
-    }
+    // Máy tính đánh
+    await Future.delayed(const Duration(milliseconds: 500));
+    _makeComputerMove();
+  }
 
-    // Kiểm tra đường chéo phụ
-    count = 0;
-    minDiag = min(x, board.length - 1 - y);
-    startX = x - minDiag;
-    startY = y + minDiag;
-    while (startX < board.length && startY >= 0) {
-      if (board[startX][startY] == player) {
-        count++;
-        if (count == 5) return true;
-      } else {
-        count = 0;
+  void _makeComputerMove() {
+    if (_currentGame == null || _currentGame!.status != 'playing') return;
+
+    // Tìm nước đi tốt nhất
+    final move = _findBestMove();
+    if (move != null) {
+      final newBoard = List<List<String>>.from(
+        _currentGame!.board.map((row) => List<String>.from(row)),
+      );
+      newBoard[move.x][move.y] = 'O';
+
+      _currentGame = Game(
+        id: _currentGame!.id,
+        players: _currentGame!.players,
+        currentPlayer: _currentUser!,
+        board: newBoard,
+        status: 'playing',
+        createdAt: _currentGame!.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+
+      // Kiểm tra thắng
+      if (_checkWin(move.x, move.y)) {
+        _currentGame = Game(
+          id: _currentGame!.id,
+          players: _currentGame!.players,
+          currentPlayer: _currentGame!.currentPlayer,
+          board: _currentGame!.board,
+          status: 'finished',
+          winner: _computer,
+          createdAt: _currentGame!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+        notifyListeners();
+        return;
       }
-      startX++;
-      startY--;
+
+      // Kiểm tra hòa
+      if (_checkDraw()) {
+        _currentGame = Game(
+          id: _currentGame!.id,
+          players: _currentGame!.players,
+          currentPlayer: _currentGame!.currentPlayer,
+          board: _currentGame!.board,
+          status: 'finished',
+          createdAt: _currentGame!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+        notifyListeners();
+      }
+    }
+  }
+
+  bool _checkWin(int x, int y) {
+    final directions = [
+      [1, 0], // ngang
+      [0, 1], // dọc
+      [1, 1], // chéo xuống
+      [1, -1], // chéo lên
+    ];
+
+    final player = _currentGame!.board[x][y];
+
+    for (final direction in directions) {
+      var count = 1;
+
+      // Kiểm tra theo hướng thuận
+      var i = x + direction[0];
+      var j = y + direction[1];
+      while (i >= 0 &&
+          i < 15 &&
+          j >= 0 &&
+          j < 15 &&
+          _currentGame!.board[i][j] == player) {
+        count++;
+        i += direction[0];
+        j += direction[1];
+      }
+
+      // Kiểm tra theo hướng ngược
+      i = x - direction[0];
+      j = y - direction[1];
+      while (i >= 0 &&
+          i < 15 &&
+          j >= 0 &&
+          j < 15 &&
+          _currentGame!.board[i][j] == player) {
+        count++;
+        i -= direction[0];
+        j -= direction[1];
+      }
+
+      if (count >= 5) return true;
     }
 
     return false;
   }
 
-  (int, int)? _findBestMove(List<List<int>> board) {
-    final moves = <(int, int)>[];
-    for (var i = 0; i < board.length; i++) {
-      for (var j = 0; j < board.length; j++) {
-        if (board[i][j] == 0) {
-          moves.add((i, j));
-        }
+  bool _checkDraw() {
+    for (var i = 0; i < 15; i++) {
+      for (var j = 0; j < 15; j++) {
+        if (_currentGame!.board[i][j] == '') return false;
       }
     }
+    return true;
+  }
 
-    if (moves.isEmpty) return null;
-
-    // Tìm nước đi có thể thắng
-    for (final move in moves) {
-      board[move.$1][move.$2] = 2;
-      if (_checkWin(board, move.$1, move.$2, 2)) {
-        board[move.$1][move.$2] = 0;
-        return move;
-      }
-      board[move.$1][move.$2] = 0;
-    }
-
-    // Chặn nước đi có thể thua
-    for (final move in moves) {
-      board[move.$1][move.$2] = 1;
-      if (_checkWin(board, move.$1, move.$2, 1)) {
-        board[move.$1][move.$2] = 0;
-        return move;
-      }
-      board[move.$1][move.$2] = 0;
-    }
-
-    // Chọn ngẫu nhiên
-    return moves[Random().nextInt(moves.length)];
+  Move? _findBestMove() {
+    // Tìm nước đi tốt nhất cho máy tính
+    // TODO: Implement AI algorithm
+    return null;
   }
 
   // Kết thúc game
-  Future<void> _endGame({String? winner}) async {
+  Future<void> _endGame({String? winnerId}) async {
     if (_currentGame == null) return;
 
     _currentGame = Game(
       id: _currentGame!.id,
-      creator: _currentGame!.creator,
-      opponent: _currentGame!.opponent,
+      players: _currentGame!.players,
+      currentPlayer: _currentGame!.currentPlayer,
       board: _currentGame!.board,
-      isFinished: true,
-      winner: winner,
-      currentTurn: '',
+      status: 'finished',
+      winner: winnerId == 'offline_user' ? _currentUser : _computer,
       createdAt: _currentGame!.createdAt,
+      updatedAt: DateTime.now(),
     );
     notifyListeners();
 
     // Cập nhật thống kê
-    if (winner == 'offline_user') {
+    if (winnerId == 'offline_user') {
       await _storage.updateOfflineStats(isWin: true);
     } else {
       await _storage.updateOfflineStats(isWin: false);
@@ -233,11 +296,7 @@ class OfflineGameProvider with ChangeNotifier {
   }
 
   void resetGame() {
-    _board = List.generate(3, (_) => List.filled(3, ''));
-    _currentPlayer = 'X';
-    _winner = null;
-    _isGameOver = false;
-    _messages.clear();
+    _currentGame = null;
     notifyListeners();
   }
 
@@ -250,4 +309,11 @@ class OfflineGameProvider with ChangeNotifier {
     ));
     notifyListeners();
   }
+}
+
+class Move {
+  final int x;
+  final int y;
+
+  Move(this.x, this.y);
 }

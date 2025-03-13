@@ -2,72 +2,72 @@ import 'user.dart';
 
 class Game {
   final String id;
-  final User creator;
-  final User? opponent;
-  final List<List<int>> board;
-  final bool isFinished;
-  final String? winner;
-  final String currentTurn;
+  final List<User> players;
+  final User currentPlayer;
+  final List<List<String>> board;
+  final String status;
+  final User? winner;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   Game({
     required this.id,
-    required this.creator,
-    this.opponent,
+    required this.players,
+    required this.currentPlayer,
     required this.board,
-    required this.isFinished,
+    required this.status,
     this.winner,
-    required this.currentTurn,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory Game.fromJson(Map<String, dynamic> json) {
     return Game(
       id: json['id'] as String,
-      creator: User.fromJson(json['creator'] as Map<String, dynamic>),
-      opponent: json['opponent'] != null
-          ? User.fromJson(json['opponent'] as Map<String, dynamic>)
-          : null,
+      players: (json['players'] as List<dynamic>)
+          .map((player) => User.fromJson(player as Map<String, dynamic>))
+          .toList(),
+      currentPlayer:
+          User.fromJson(json['currentPlayer'] as Map<String, dynamic>),
       board: (json['board'] as List<dynamic>)
           .map((row) =>
-              (row as List<dynamic>).map((cell) => cell as int).toList())
+              (row as List<dynamic>).map((cell) => cell as String).toList())
           .toList(),
-      isFinished: json['isFinished'] as bool,
-      winner: json['winner'] as String?,
-      currentTurn: json['currentTurn'] as String,
+      status: json['status'] as String,
+      winner: json['winner'] != null
+          ? User.fromJson(json['winner'] as Map<String, dynamic>)
+          : null,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'creator': creator.toJson(),
-      'opponent': opponent?.toJson(),
+      'players': players.map((player) => player.toJson()).toList(),
+      'currentPlayer': currentPlayer.toJson(),
       'board': board,
-      'isFinished': isFinished,
-      'winner': winner,
-      'currentTurn': currentTurn,
+      'status': status,
+      'winner': winner?.toJson(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   bool canJoin(String userId) {
-    return !isFinished && opponent == null && creator.id != userId;
+    return status == 'waiting' && !players.any((player) => player.id == userId);
   }
 
   bool canPlay(String userId) {
-    return !isFinished &&
-        opponent != null &&
-        currentTurn == userId &&
-        (creator.id == userId || opponent!.id == userId);
+    return status == 'playing' &&
+        currentPlayer.id == userId &&
+        players.any((player) => player.id == userId);
   }
 
   String? getWinnerName() {
-    if (!isFinished || winner == null) return null;
-    if (winner == creator.id) return creator.username;
-    if (opponent != null && winner == opponent!.id) return opponent!.username;
-    return null;
+    if (status != 'finished' || winner == null) return null;
+    return winner!.username;
   }
 }
 

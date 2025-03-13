@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class GameBoard extends StatelessWidget {
-  final List<List<int>> board;
+  final List<List<String>> board;
   final Function(int x, int y) onTap;
 
   const GameBoard({
@@ -29,10 +29,10 @@ class GameBoard extends StatelessWidget {
               border: Border.all(color: Colors.grey),
             ),
             child: Center(
-              child: value == 0
+              child: value.isEmpty
                   ? null
                   : Text(
-                      value == 1 ? 'X' : 'O',
+                      value,
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,

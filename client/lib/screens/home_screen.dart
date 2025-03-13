@@ -72,14 +72,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 return ListTile(
                   title: Text('Trận đấu #${game.id}'),
                   subtitle: Text(
-                    game.opponent == null
+                    game.players.length == 1
                         ? 'Đang chờ đối thủ'
-                        : 'Đấu với ${game.opponent!.username}',
+                        : 'Đấu với ${game.players[1].username}',
                   ),
-                  trailing: game.opponent == null
+                  trailing: game.players.length == 1
                       ? const Text('Đang chờ')
                       : Text(
-                          game.isFinished ? 'Đã kết thúc' : 'Đang diễn ra',
+                          game.status == 'finished'
+                              ? 'Đã kết thúc'
+                              : 'Đang diễn ra',
                         ),
                   onTap: () {
                     gameProvider.joinGame(game.id);

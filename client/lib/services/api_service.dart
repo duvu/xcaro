@@ -24,6 +24,12 @@ class ApiService {
         }
         return handler.next(options);
       },
+      onError: (error, handler) {
+        if (error.response?.statusCode == 401) {
+          _storage.clear();
+        }
+        return handler.next(error);
+      },
     ));
   }
 
@@ -46,10 +52,11 @@ class ApiService {
     }
   }
 
-  Future<User> register(String username, String password) async {
+  Future<User> register(String username, String email, String password) async {
     try {
       final response = await _dio.post('/auth/register', data: {
         'username': username,
+        'email': email,
         'password': password,
       });
 
@@ -67,7 +74,7 @@ class ApiService {
 
   Future<User> getCurrentUser() async {
     try {
-      final response = await _dio.get('/auth/me');
+      final response = await _dio.get('/profile');
       final user = User.fromJson(response.data);
       await _storage.saveUser(user);
       return user;
@@ -126,8 +133,8 @@ class ApiService {
   }
 
   String _handleError(DioException e) {
-    if (e.response?.data != null && e.response!.data['message'] != null) {
-      return e.response!.data['message'];
+    if (e.response?.data != null && e.response!.data['error'] != null) {
+      return e.response!.data['error'];
     }
     return 'Có lỗi xảy ra. Vui lòng thử lại sau.';
   }

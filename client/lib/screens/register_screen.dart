@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../config/app_config.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,6 +13,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
@@ -19,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -32,6 +35,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await context.read<AuthProvider>().register(
             _usernameController.text,
+            _emailController.text,
             _passwordController.text,
           );
       if (mounted) {
@@ -78,8 +82,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập tên đăng nhập';
                     }
-                    if (value.length < 3) {
-                      return 'Tên đăng nhập phải có ít nhất 3 ký tự';
+                    if (value.length < AppConfig.minUsernameLength) {
+                      return 'Tên đăng nhập phải có ít nhất ${AppConfig.minUsernameLength} ký tự';
+                    }
+                    if (value.length > AppConfig.maxUsernameLength) {
+                      return 'Tên đăng nhập không được quá ${AppConfig.maxUsernameLength} ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Vui lòng nhập email';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Email không hợp lệ';
                     }
                     return null;
                   },
@@ -96,8 +121,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
                     }
-                    if (value.length < 6) {
-                      return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    if (value.length < AppConfig.minPasswordLength) {
+                      return 'Mật khẩu phải có ít nhất ${AppConfig.minPasswordLength} ký tự';
                     }
                     return null;
                   },
