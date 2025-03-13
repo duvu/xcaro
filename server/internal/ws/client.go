@@ -183,3 +183,12 @@ func (c *Client) LeaveRoom() {
 		c.CurrentRoom = ""
 	}
 }
+
+func (c *Client) Send(message *WSMessage) {
+	select {
+	case c.send <- message:
+	default:
+		close(c.send)
+		delete(c.hub.clients, c)
+	}
+}

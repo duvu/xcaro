@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/duvu/xcaro/server/internal/ws"
 	"github.com/duvu/xcaro/server/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,11 +18,24 @@ const (
 )
 
 type Service struct {
-	db *mongo.Database
+	db  *mongo.Database
+	hub *ws.Hub
 }
 
-func NewService(db *mongo.Database) *Service {
-	return &Service{db: db}
+func NewService(db *mongo.Database, hub *ws.Hub) *Service {
+	return &Service{
+		db:  db,
+		hub: hub,
+	}
+}
+
+// broadcastGame gửi thông tin game đến tất cả clients trong game
+func (s *Service) broadcastGame(game *models.Game) {
+	s.hub.Broadcast(&ws.WSMessage{
+		Type:    ws.EventGameState,
+		RoomID:  game.ID.Hex(),
+		Payload: game,
+	})
 }
 
 func (s *Service) CreateGame(ctx context.Context, req *models.CreateGameRequest) (*models.Game, error) {
@@ -87,6 +101,9 @@ func (s *Service) JoinGame(ctx context.Context, req *models.JoinGameRequest) (*m
 	if err != nil {
 		return nil, err
 	}
+
+	// Broadcast thông tin game mới
+	s.broadcastGame(&game)
 
 	return &game, nil
 }
@@ -158,6 +175,9 @@ func (s *Service) MakeMove(ctx context.Context, req *models.MakeMoveRequest) (*m
 	if err != nil {
 		return nil, err
 	}
+
+	// Broadcast thông tin game mới
+	s.broadcastGame(&game)
 
 	return &game, nil
 }

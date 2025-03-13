@@ -1,20 +1,4 @@
-version: '3.8'
-
 services:
-  server:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - MONGODB_URI=mongodb://admin:secret@mongodb:27017/xcaro?authSource=admin
-      - DB_NAME=xcaro
-      - PORT=8080
-      - JWT_SECRET=xcaro-jwt-secret-key-2024
-    depends_on:
-      - mongodb
-
   mongodb:
     image: mongo:latest
     container_name: mongodb
@@ -43,6 +27,20 @@ services:
       interval: 30s   # Kiểm tra mỗi 30 giây
       timeout: 10s    # Nếu quá 10s không phản hồi, coi như thất bại
       retries: 5      # Thử lại tối đa 5 lần trước khi restart container
+
+  xcaro-server:
+    build: .
+    container_name: xcaro-server
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - MONGODB_URI=mongodb://admin:secret@mongodb:27017/xcaro?authSource=admin
+      - DB_NAME=xcaro
+      - PORT=8080
+      - JWT_SECRET=xcaro-jwt-secret-key-2024
+    depends_on:
+      - mongodb
 
 volumes:
   mongodb_data:

@@ -166,6 +166,17 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "cập nhật profile thành công"})
 }
 
+// ChangePassword godoc
+// @Summary Đổi mật khẩu
+// @Description Đổi mật khẩu của người dùng hiện tại
+// @Tags profile
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param request body models.ChangePasswordRequest true "Thông tin đổi mật khẩu"
+// @Success 200 {object} map[string]string "message"
+// @Failure 400,401 {object} map[string]string "error"
+// @Router /profile/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
 	// Lấy user ID từ context
 	userID, exists := c.Get("userID")
@@ -196,6 +207,17 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "đổi mật khẩu thành công"})
 }
 
+// UpdateEmail godoc
+// @Summary Cập nhật email
+// @Description Cập nhật email của người dùng hiện tại
+// @Tags profile
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param request body models.UpdateEmailRequest true "Thông tin cập nhật email"
+// @Success 200 {object} map[string]string "message"
+// @Failure 400,401 {object} map[string]string "error"
+// @Router /profile/email [put]
 func (h *Handler) UpdateEmail(c *gin.Context) {
 	// Lấy user ID từ context
 	userID, exists := c.Get("userID")
@@ -226,6 +248,17 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "cập nhật email thành công"})
 }
 
+// ListUsers godoc
+// @Summary Lấy danh sách người dùng
+// @Description Lấy danh sách tất cả người dùng (chỉ admin)
+// @Tags admin
+// @Security ApiKeyAuth
+// @Produce json
+// @Param page query int false "Số trang" default(1)
+// @Param limit query int false "Số lượng mỗi trang" default(10)
+// @Success 200 {object} models.ListUsersResponse
+// @Failure 401,403 {object} map[string]string "error"
+// @Router /admin/users [get]
 func (h *Handler) ListUsers(c *gin.Context) {
 	// Parse query parameters
 	page := int64(1)
@@ -247,6 +280,18 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// UpdateRole godoc
+// @Summary Cập nhật role người dùng
+// @Description Cập nhật role của một người dùng (chỉ admin)
+// @Tags admin
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param request body models.UpdateRoleRequest true "Thông tin cập nhật role"
+// @Success 200 {object} map[string]string "message"
+// @Failure 400,401,403 {object} map[string]string "error"
+// @Router /admin/users/{id}/role [put]
 func (h *Handler) UpdateRole(c *gin.Context) {
 	var req models.UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -275,6 +320,18 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "cập nhật role thành công"})
 }
 
+// BanUser godoc
+// @Summary Cấm người dùng
+// @Description Cấm một người dùng (chỉ admin)
+// @Tags admin
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param request body models.BanUserRequest true "Thông tin cấm người dùng"
+// @Success 200 {object} map[string]string "message"
+// @Failure 400,401,403 {object} map[string]string "error"
+// @Router /admin/users/{id}/ban [post]
 func (h *Handler) BanUser(c *gin.Context) {
 	var req models.BanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -291,6 +348,18 @@ func (h *Handler) BanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "cấm người dùng thành công"})
 }
 
+// UnbanUser godoc
+// @Summary Bỏ cấm người dùng
+// @Description Bỏ cấm một người dùng (chỉ admin)
+// @Tags admin
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param request body models.UnbanUserRequest true "Thông tin bỏ cấm người dùng"
+// @Success 200 {object} map[string]string "message"
+// @Failure 400,401,403 {object} map[string]string "error"
+// @Router /admin/users/{id}/unban [post]
 func (h *Handler) UnbanUser(c *gin.Context) {
 	var req models.UnbanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

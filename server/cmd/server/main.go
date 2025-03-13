@@ -39,6 +39,21 @@ import (
 // @in header
 // @name Authorization
 
+// @tag.name auth
+// @tag.description Các endpoint liên quan đến xác thực và quản lý người dùng
+
+// @tag.name game
+// @tag.description Các endpoint liên quan đến game cờ caro
+
+// @tag.name profile
+// @tag.description Các endpoint liên quan đến quản lý thông tin cá nhân
+
+// @tag.name admin
+// @tag.description Các endpoint quản trị viên
+
+// @tag.name websocket
+// @tag.description Các endpoint WebSocket cho kết nối real-time
+
 func init() {
 	// Load các biến môi trường từ file .env
 	if err := godotenv.Load(); err != nil {
@@ -78,12 +93,13 @@ func main() {
 	authService := auth.NewService(db)
 	authHandler := auth.NewHandler(authService)
 
-	gameService := game.NewService(db)
-	gameHandler := game.NewHandler(gameService)
-
 	// Khởi tạo WebSocket hub
 	hub := ws.NewHub()
 	go hub.Run()
+
+	gameService := game.NewService(db, hub)
+	gameHandler := game.NewHandler(gameService, hub)
+
 	wsHandler := ws.NewHandler(hub)
 
 	// Khởi tạo router
@@ -155,13 +171,23 @@ func main() {
 			games.Use(auth.RequirePermission(models.PermCreateGame))
 			{
 				games.POST("", gameHandler.CreateGame)
+				games.GET("", gameHandler.ListGames)
+				games.GET("/history", gameHandler.GetGameHistory)
+				games.GET("/stats", gameHandler.GetGameStats)
 				games.GET("/:id", gameHandler.GetGame)
 				games.POST("/:id/join", gameHandler.JoinGame)
 				games.POST("/:id/move", gameHandler.MakeMove)
+				games.GET("/:id/ws", gameHandler.WebSocketGame)
 			}
 
-			// WebSocket endpoint
-			api.GET("/ws", wsHandler.HandleWebSocket)
+			// WebSocket routes
+			ws := protected.Group("/ws")
+			{
+				ws.GET("", wsHandler.Connect)
+				ws.POST("/rooms/join", wsHandler.JoinRoom)
+				ws.POST("/rooms/leave", wsHandler.LeaveRoom)
+				ws.POST("/messages", wsHandler.SendMessage)
+			}
 		}
 	}
 

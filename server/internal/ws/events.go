@@ -23,6 +23,12 @@ const (
 	EventError = "error" // Thông báo lỗi
 	EventPing  = "ping"  // Kiểm tra kết nối
 	EventPong  = "pong"  // Phản hồi kiểm tra kết nối
+
+	MessageTypeMove = "move"
+	MessageTypeChat = "chat"
+	MessageTypeOffer = "offer"
+	MessageTypeAnswer = "answer"
+	MessageTypeIceCandidate = "ice-candidate"
 )
 
 // WSMessage định nghĩa cấu trúc message WebSocket
@@ -62,4 +68,21 @@ type StreamStatusPayload struct {
 type ErrorPayload struct {
 	Code    string `json:"code"`    // Mã lỗi
 	Message string `json:"message"` // Thông báo lỗi
+}
+
+type Message struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+type ChatMessage struct {
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Content   string `json:"content"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+type WebRTCMessage struct {
+	UserID string      `json:"user_id"`
+	Data   interface{} `json:"data"`
 }

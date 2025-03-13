@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -49,4 +50,45 @@ type MakeMoveRequest struct {
 	PlayerID primitive.ObjectID `json:"player_id" binding:"required"`
 	Row      int              `json:"row" binding:"required"`
 	Col      int              `json:"col" binding:"required"`
+}
+
+// GameStats thống kê về số trận thắng/thua/hòa của người dùng
+type GameStats struct {
+	UserID    string `json:"user_id" bson:"user_id"`
+	Wins      int    `json:"wins" bson:"wins"`
+	Losses    int    `json:"losses" bson:"losses"`
+	Draws     int    `json:"draws" bson:"draws"`
+	TotalGames int   `json:"total_games" bson:"total_games"`
+	WinRate   float64 `json:"win_rate" bson:"win_rate"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+}
+
+// ListGamesRequest request cho việc lấy danh sách game
+type ListGamesRequest struct {
+	Status string `json:"status" form:"status"` // waiting/playing/finished
+	Page   int    `json:"page" form:"page"`     // Số trang
+	Limit  int    `json:"limit" form:"limit"`   // Số lượng game mỗi trang
+}
+
+// GetGameHistoryRequest request cho việc lấy lịch sử game
+type GetGameHistoryRequest struct {
+	UserID string `json:"user_id" form:"user_id" binding:"required"`
+	Status string `json:"status" form:"status"` // waiting/playing/finished
+	Page   int    `json:"page" form:"page"`     // Số trang
+	Limit  int    `json:"limit" form:"limit"`   // Số lượng game mỗi trang
+}
+
+// GetGameStatsRequest request cho việc lấy thống kê game
+type GetGameStatsRequest struct {
+	UserID string `json:"user_id" form:"user_id" binding:"required"`
+}
+
+// String chuyển đổi game thành JSON string
+func (g *Game) String() string {
+	bytes, err := json.Marshal(g)
+	if err != nil {
+		return "{}"
+	}
+	return string(bytes)
 } 
