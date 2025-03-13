@@ -1,0 +1,38 @@
+name: xcaro
+description: A Caro game with Flutter
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  provider: ^6.0.5
+  shared_preferences: ^2.2.2
+  http: ^1.1.0
+  dio: ^5.3.3
+  web_socket_channel: ^2.4.0
+  equatable: ^2.0.5
+  json_annotation: ^4.8.1
+  flame: ^1.14.0
+  flame_audio: ^2.1.7
+  flutter_svg: ^2.0.9
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  build_runner: ^2.4.6
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/audio/
+    - assets/ 
