@@ -1,5 +1,5 @@
 name: xcaro
-description: "Game cờ caro với chế độ chơi với người và máy"
+description: A new Flutter project.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,22 +10,31 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  provider: ^6.1.1
+  provider: ^6.0.5
+  http: ^1.1.0
+  web_socket_channel: ^2.4.0
+  shared_preferences: ^2.2.1
+  json_annotation: ^4.8.1
+  equatable: ^2.0.5
+  connectivity_plus: ^5.0.2
   confetti: ^0.7.0
-  flame: ^1.14.0
-  just_audio: ^0.9.36
+  flame: ^1.10.1
+  just_audio: ^0.9.35
+  path_provider: ^2.1.1
+  dio: ^5.8.0+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.6
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/sounds/
-    - assets/icon/
+    - assets/images/
+    - assets/audio/
 
 flutter_icons:
   android: "launcher_icon"

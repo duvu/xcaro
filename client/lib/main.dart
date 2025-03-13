@@ -5,9 +5,46 @@ import 'package:flame/game.dart';
 import 'dart:math' show pi;
 import 'game_board.dart';
 import 'game/caro_game.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/api_service.dart';
+import 'services/websocket_service.dart';
+import 'services/local_storage_service.dart';
+import 'services/connectivity_service.dart';
+import 'providers/auth_provider.dart';
+import 'providers/game_provider.dart';
+import 'providers/offline_game_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/game_screen.dart';
+import 'screens/offline_game_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final storage = LocalStorageService(prefs);
+  final apiService = ApiService(storage);
+  final gameBoard = GameBoard();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(apiService, storage),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GameProvider(apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => OfflineGameProvider(storage),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GameBoard(),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -16,14 +53,19 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Caro Game',
+      title: 'XCaro',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
-      home: ChangeNotifierProvider(
-        create: (context) => GameBoard(),
-        child: const GameScreen(),
-      ),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const GameScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/game': (context) => const GameScreen(),
+      },
     );
   }
 }
@@ -101,6 +143,30 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
         actions: [
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, child) {
+              if (!authProvider.isAuthenticated) {
+                return TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/login'),
+                  child: const Text('Đăng nhập',
+                      style: TextStyle(color: Colors.white)),
+                );
+              } else {
+                return Row(
+                  children: [
+                    Text(authProvider.currentUser?.username ?? '',
+                        style: const TextStyle(color: Colors.white)),
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      onPressed: () {
+                        authProvider.logout();
+                      },
+                    ),
+                  ],
+                );
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
