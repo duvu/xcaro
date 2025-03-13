@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  server:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - MONGODB_URI=mongodb://admin:secret@mongodb:27017/xcaro?authSource=admin
+      - DB_NAME=xcaro
+      - PORT=8080
+      - JWT_SECRET=xcaro-jwt-secret-key-2024
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"  # Remote Access
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_logs:/var/log/mongodb
+    deploy:
+      resources:
+        limits:
+          cpus: '2'  # Giới hạn tối đa 2 CPU
+          memory: 2G  # Giới hạn RAM tối đa 2GB
+    command: ["mongod", "--logpath", "/var/log/mongodb/mongod.log", "--bind_ip", "0.0.0.0"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"   # Log file tối đa 10MB
+        max-file: "3"     # Giữ tối đa 3 file log (tổng ~30MB)
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 30s   # Kiểm tra mỗi 30 giây
+      timeout: 10s    # Nếu quá 10s không phản hồi, coi như thất bại
+      retries: 5      # Thử lại tối đa 5 lần trước khi restart container
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_logs:
+    driver: local
