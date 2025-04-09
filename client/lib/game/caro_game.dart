@@ -251,8 +251,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
   @override
   bool onDragUpdate(DragUpdateEvent event) {
     if (isDragging && !isAnimating) {
-      final delta = event.canvasPosition - dragStart;
-      final newPosition = initialBoardPosition + delta;
+      final newPosition = initialBoardPosition + event.localDelta;
 
       // Giới hạn vùng di chuyển
       final minY = -size.y * 0.2; // Giới hạn trên
@@ -265,7 +264,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
         newPosition.y.clamp(minY, maxY),
       );
 
-      print('🔄 Board Position Updated: $boardPosition, Delta: $delta');
+      print('🔄 Board Position Updated: $boardPosition, Delta: ${event.localDelta}');
     }
     return true;
   }
