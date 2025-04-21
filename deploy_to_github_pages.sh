@@ -37,8 +37,6 @@ fi
 echo "Verifying temp_web directory contents:"
 ls -la temp_web/
 
-# Stash any changes in the current branch
-git stash -u || echo "No changes to stash"
 
 # Create or get the gh-pages branch
 if git ls-remote --heads origin gh-pages | grep -q 'gh-pages'; then
