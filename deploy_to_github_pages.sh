@@ -7,12 +7,18 @@ set -e
 CURRENT_BRANCH=$(git symbolic-ref --short HEAD)
 echo "Current branch: $CURRENT_BRANCH"
 
+# Clean up any existing build directories to prevent conflicts
+echo "Cleaning up existing build directories..."
+rm -rf client/build/web
+rm -rf temp_web
+
 # Go to client directory
 cd client
 
 # Build Flutter web app
 echo "Building Flutter web app..."
-flutter build web --release --base-href /xcaro/
+# Changed to use root path since we're using a custom domain
+flutter build web --release --base-href /
 
 # Go back to project root
 cd ..
@@ -21,6 +27,18 @@ cd ..
 echo "Creating temporary directory for gh-pages branch..."
 mkdir -p temp_web
 cp -R client/build/web/* temp_web/
+# Copy CNAME file to ensure GitHub Pages uses the custom domain
+cp CNAME temp_web/ || echo "CNAME file not found, creating it..."
+if [ ! -f "temp_web/CNAME" ]; then
+  echo "games.x51.vn" > temp_web/CNAME
+fi
+
+# Verify temp_web directory has content
+echo "Verifying temp_web directory contents:"
+ls -la temp_web/
+
+# Stash any changes in the current branch
+git stash -u || echo "No changes to stash"
 
 # Create or get the gh-pages branch
 if git ls-remote --heads origin gh-pages | grep -q 'gh-pages'; then
@@ -34,22 +52,24 @@ else
   git push origin gh-pages
 fi
 
-# Clean the branch and copy the web build
-echo "Updating gh-pages branch with new build..."
-# Use --ignore-unmatch to prevent errors if no files exist
-git rm -rf --ignore-unmatch ./*
+# Clean the branch 
+echo "Cleaning gh-pages branch..."
+find . -maxdepth 1 ! -name .git ! -name . -exec rm -rf {} \;
+
 # Copy the new build files from temp directory
+echo "Copying web build files to gh-pages branch..."
 cp -R temp_web/* .
 rm -rf temp_web
 
 # Add, commit and push the changes
 echo "Committing and pushing changes to gh-pages branch..."
 git add -A .
-git commit -m "Update GitHub Pages deployment $(date)"
+git commit -m "Update GitHub Pages deployment for games.x51.vn $(date)"
 git push origin gh-pages
 
 # Go back to the original branch
 echo "Returning to $CURRENT_BRANCH branch..."
 git checkout "$CURRENT_BRANCH"
+git stash pop || echo "No stash to pop"
 
-echo "Deployment complete! Your app should be available at https://duvu.github.io/xcaro/"
+echo "Deployment complete! Your app should be available at https://games.x51.vn/"
