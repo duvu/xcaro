@@ -18,7 +18,7 @@ cd client
 # Build Flutter web app
 echo "Building Flutter web app..."
 # Change the base-href to ensure assets are loaded correctly
-flutter build web --release --base-href='./'
+flutter build web --release --base-href='/'
 
 # Go back to project root
 cd ..
