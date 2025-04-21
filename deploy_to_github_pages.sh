@@ -17,8 +17,8 @@ cd client
 
 # Build Flutter web app
 echo "Building Flutter web app..."
-# Changed to use root path since we're using a custom domain
-flutter build web --release --base-href /
+# Change the base-href to ensure assets are loaded correctly
+flutter build web --release --base-href='./'
 
 # Go back to project root
 cd ..
