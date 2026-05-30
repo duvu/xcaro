@@ -42,3 +42,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local agent/session state
+.omo/
+.serena/
+
+# Flutter build artifacts inside the client project
+client/build/
