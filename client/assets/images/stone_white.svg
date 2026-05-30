@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="White Gomoku stone">
+  <defs>
+    <radialGradient id="whiteStone" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#F0EAD6"/>
+      <stop offset="100%" stop-color="#D0C8B0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="url(#whiteStone)"/>
+  <circle cx="64" cy="66" r="18" fill="#B8AF98" opacity="0.16"/>
+</svg>
