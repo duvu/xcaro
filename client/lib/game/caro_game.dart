@@ -2,14 +2,13 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import '../game_board.dart';
 import '../audio_manager.dart';
 
 class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
   final GameBoard gameBoard;
   final AudioManager audioManager = AudioManager();
-  static const double CELL_SIZE = 40.0;
+  static const double cellSize = 40.0;
   Vector2 boardPosition = Vector2.zero();
   Vector2 targetPosition = Vector2.zero();
   bool isAnimating = false;
@@ -29,8 +28,8 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
   (int, int) canvasToCell(Vector2 position) {
     final relativeX = position.x - boardPosition.x;
     final relativeY = position.y - boardPosition.y;
-    final col = (relativeX / CELL_SIZE).floor();
-    final row = (relativeY / CELL_SIZE).floor();
+    final col = (relativeX / cellSize).floor();
+    final row = (relativeY / cellSize).floor();
     return (row, col);
   }
 
@@ -41,8 +40,9 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
 
   @override
   Future<void> onLoad() async {
+    await super.onLoad();
     final screenCenter = Vector2(size.x / 2, size.y / 2);
-    final boardSize = CELL_SIZE * GameBoard.size;
+    const boardSize = cellSize * GameBoard.size;
     boardPosition = Vector2(
       screenCenter.x - boardSize / 2,
       screenCenter.y - boardSize / 2,
@@ -52,6 +52,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
 
   @override
   void render(Canvas canvas) {
+    super.render(canvas);
     // Lưu trạng thái canvas hiện tại
     canvas.save();
 
@@ -76,14 +77,14 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
       ..strokeWidth = 1.0;
 
     final Paint backgroundPaint = Paint()
-      ..color = Colors.white.withOpacity(0.8) // Giảm độ đục của nền
+      ..color = Colors.white.withValues(alpha: 0.8) // Giảm độ đục của nền
       ..style = PaintingStyle.fill;
 
     // Tính toán số lượng ô cần vẽ để phủ kín màn hình
-    final startX = ((-boardPosition.x) / CELL_SIZE).floor() - 1;
-    final startY = ((-boardPosition.y) / CELL_SIZE).floor() - 1;
-    final endX = ((size.x - boardPosition.x) / CELL_SIZE).ceil() + 1;
-    final endY = ((size.y - boardPosition.y) / CELL_SIZE).ceil() + 1;
+    final startX = ((-boardPosition.x) / cellSize).floor() - 1;
+    final startY = ((-boardPosition.y) / cellSize).floor() - 1;
+    final endX = ((size.x - boardPosition.x) / cellSize).ceil() + 1;
+    final endY = ((size.y - boardPosition.y) / cellSize).ceil() + 1;
 
     // Cập nhật viewport
     viewportStartRow = startY;
@@ -97,10 +98,10 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
       for (var j = startX; j < endX; j++) {
         final rect = RRect.fromRectAndRadius(
           Rect.fromLTWH(
-            boardPosition.x + j * CELL_SIZE,
-            boardPosition.y + i * CELL_SIZE,
-            CELL_SIZE,
-            CELL_SIZE,
+            boardPosition.x + j * cellSize,
+            boardPosition.y + i * cellSize,
+            cellSize,
+            cellSize,
           ),
           const Radius.circular(4),
         );
@@ -111,28 +112,18 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
   }
 
   void _drawPieces(Canvas canvas) {
-    final startX = ((-boardPosition.x) / CELL_SIZE).floor() - 1;
-    final startY = ((-boardPosition.y) / CELL_SIZE).floor() - 1;
-    final endX = ((size.x - boardPosition.x) / CELL_SIZE).ceil() + 1;
-    final endY = ((size.y - boardPosition.y) / CELL_SIZE).ceil() + 1;
+    final startX = ((-boardPosition.x) / cellSize).floor() - 1;
+    final startY = ((-boardPosition.y) / cellSize).floor() - 1;
+    final endX = ((size.x - boardPosition.x) / cellSize).ceil() + 1;
+    final endY = ((size.y - boardPosition.y) / cellSize).ceil() + 1;
 
     for (var i = startY; i < endY; i++) {
       for (var j = startX; j < endX; j++) {
         final value = gameBoard.getCellValue(i, j);
         if (value.isNotEmpty) {
-          final rect = RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              boardPosition.x + j * CELL_SIZE,
-              boardPosition.y + i * CELL_SIZE,
-              CELL_SIZE,
-              CELL_SIZE,
-            ),
-            const Radius.circular(4),
-          );
-
           final textConfig = TextPaint(
             style: TextStyle(
-              fontSize: CELL_SIZE * 0.6,
+              fontSize: cellSize * 0.6,
               fontWeight: FontWeight.bold,
               color: value == 'X' ? Colors.blue : Colors.red,
             ),
@@ -142,8 +133,8 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
             canvas,
             value,
             Vector2(
-              boardPosition.x + j * CELL_SIZE + CELL_SIZE / 2,
-              boardPosition.y + i * CELL_SIZE + CELL_SIZE / 2,
+              boardPosition.x + j * cellSize + cellSize / 2,
+              boardPosition.y + i * cellSize + cellSize / 2,
             ),
             anchor: Anchor.center,
           );
@@ -162,7 +153,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
         fontSize: 24,
         fontWeight: FontWeight.bold,
         color: Colors.black87,
-        backgroundColor: Colors.white.withOpacity(0.8),
+        backgroundColor: Colors.white.withValues(alpha: 0.8),
       ),
     );
 
@@ -189,7 +180,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
     canvas.drawRRect(
       backgroundRect,
       Paint()
-        ..color = Colors.white.withOpacity(0.9)
+        ..color = Colors.white.withValues(alpha: 0.9)
         ..style = PaintingStyle.fill,
     );
 
@@ -210,6 +201,7 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
     );
   }
 
+  @override
   void update(double dt) {
     super.update(dt);
 
@@ -232,19 +224,16 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
 
   @override
   bool onDragStart(DragStartEvent event) {
-    print('🖱️ Drag Start at: ${event.canvasPosition}');
+    super.onDragStart(event);
     if (isAnimating) {
-      print('❌ Drag ignored - Animation in progress');
       return false;
     }
     if (gameBoard.isGameOver) {
-      print('❌ Drag ignored - Game is over');
       return false;
     }
     isDragging = true;
     dragStart = event.canvasPosition;
     initialBoardPosition = boardPosition.clone();
-    print('✅ Drag Started - Initial Board Position: $initialBoardPosition');
     return true;
   }
 
@@ -263,22 +252,20 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
         newPosition.x.clamp(minX, maxX),
         newPosition.y.clamp(minY, maxY),
       );
-
-      print('🔄 Board Position Updated: $boardPosition, Delta: ${event.localDelta}');
     }
     return true;
   }
 
   @override
   bool onDragEnd(DragEndEvent event) {
-    print('🖱️ Drag Ended');
+    super.onDragEnd(event);
     isDragging = false;
     return true;
   }
 
   @override
   void onDragCancel(DragCancelEvent event) {
-    print('❌ Drag Cancelled');
+    super.onDragCancel(event);
     isDragging = false;
   }
 
@@ -292,8 +279,8 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
     // Tính toán vị trí mới để đưa quân cờ vào giữa màn hình
     final screenCenter = Vector2(size.x / 2, size.y / 2);
     final targetCellCenter = Vector2(
-      toCol * CELL_SIZE + CELL_SIZE / 2,
-      toRow * CELL_SIZE + CELL_SIZE / 2,
+      toCol * cellSize + cellSize / 2,
+      toRow * cellSize + cellSize / 2,
     );
 
     // Tính toán vị trí mới cho bàn cờ để đưa ô đích vào giữa màn hình
@@ -320,31 +307,22 @@ class CaroGame extends FlameGame with TapCallbacks, DragCallbacks {
   @override
   bool onTapDown(TapDownEvent event) {
     if (isAnimating) {
-      print('❌ Tap ignored - Animation in progress');
       return false;
     }
 
     if (gameBoard.isGameOver) {
-      print('❌ Tap ignored - Game is over');
       return false;
     }
 
     final (row, col) = canvasToCell(event.canvasPosition);
 
     if (!isValidCell(row, col)) {
-      print('❌ Tap ignored - Invalid cell position ($row, $col)');
       return false;
     }
 
-    print('🎯 Tap at cell ($row, $col)');
-
-    if (!gameBoard.getCellValue(row, col).isEmpty) {
-      print(
-          '❌ Tap ignored - Cell already occupied by ${gameBoard.getCellValue(row, col)}');
+    if (gameBoard.getCellValue(row, col).isNotEmpty) {
       return false;
     }
-
-    print('✅ Making move at ($row, $col)');
     gameBoard.makeMove(row, col);
     audioManager.playMoveSound();
     return true;

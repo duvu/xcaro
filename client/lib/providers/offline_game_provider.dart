@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/game.dart';
 import '../models/user.dart';
@@ -13,12 +12,11 @@ class OfflineGameProvider extends ChangeNotifier {
   User? _computer;
   bool _isLoading = false;
   String? _error;
-  List<List<String>> _board = List.generate(3, (_) => List.filled(3, ''));
-  String _currentPlayer = 'X';
+  final List<List<String>> _board = List.generate(3, (_) => List.filled(3, ''));
+  final String _currentPlayer = 'X';
   String? _winner;
-  bool _isGameOver = false;
-  List<chat.ChatMessage> _messages = [];
-
+  final bool _isGameOver = false;
+  final List<chat.ChatMessage> _messages = [];
 
   OfflineGameProvider(this._storage) {
     _init();
@@ -263,30 +261,6 @@ class OfflineGameProvider extends ChangeNotifier {
     // Tìm nước đi tốt nhất cho máy tính
     // TODO: Implement AI algorithm
     return null;
-  }
-
-  // Kết thúc game
-  Future<void> _endGame({String? winnerId}) async {
-    if (_currentGame == null) return;
-
-    _currentGame = Game(
-      id: _currentGame!.id,
-      players: _currentGame!.players,
-      currentPlayer: _currentGame!.currentPlayer,
-      board: _currentGame!.board,
-      status: 'finished',
-      winner: winnerId == 'offline_user' ? _currentUser : _computer,
-      createdAt: _currentGame!.createdAt,
-      updatedAt: DateTime.now(),
-    );
-    notifyListeners();
-
-    // Cập nhật thống kê
-    if (winnerId == 'offline_user') {
-      await _storage.updateOfflineStats(isWin: true);
-    } else {
-      await _storage.updateOfflineStats(isWin: false);
-    }
   }
 
   void clearError() {

@@ -22,7 +22,11 @@ class GameProvider extends ChangeNotifier {
   User? _playerO;
   bool _gameOver = false;
   String? _winner; // 'X', 'O', 'draw', 'disconnect'
+  String? _result; // 'resign', 'forfeit', 'draw', 'win', 'loss'
   String? _roomCode;
+
+  // Chat mute (client-side, session-scoped)
+  bool _chatMuted = false;
 
   StreamSubscription? _wsSubscription;
 
@@ -39,7 +43,9 @@ class GameProvider extends ChangeNotifier {
   User? get playerO => _playerO;
   bool get gameOver => _gameOver;
   String? get winner => _winner;
+  String? get result => _result;
   String? get roomCode => _roomCode;
+  bool get chatMuted => _chatMuted;
 
   void _onWsMessage(Map<String, dynamic> msg) {
     final type = msg['type'] as String?;
@@ -79,6 +85,7 @@ class GameProvider extends ChangeNotifier {
   void _applyGameOver(Map<String, dynamic> payload) {
     _gameOver = true;
     _winner = payload['winner'] as String?;
+    _result = payload['result'] as String?;
     // Apply final board if provided
     final rawBoard = payload['board'];
     if (rawBoard != null) {
@@ -86,6 +93,20 @@ class GameProvider extends ChangeNotifier {
           .map((row) => (row as List).map((c) => c as int).toList())
           .toList();
     }
+    notifyListeners();
+  }
+
+  /// Called when quick_match_found is received; sets roomCode and resets board.
+  void handleQuickMatchFound(Map<String, dynamic> payload) {
+    _roomCode = payload['room_code'] as String?;
+    _result = null;
+    _winner = null;
+    _gameOver = false;
+    notifyListeners();
+  }
+
+  void toggleChatMute() {
+    _chatMuted = !_chatMuted;
     notifyListeners();
   }
 
@@ -136,6 +157,7 @@ class GameProvider extends ChangeNotifier {
     _currentGame = null;
     _gameOver = false;
     _winner = null;
+    _result = null;
     _roomCode = null;
     notifyListeners();
   }
@@ -147,6 +169,7 @@ class GameProvider extends ChangeNotifier {
     _playerO = null;
     _gameOver = false;
     _winner = null;
+    _result = null;
     notifyListeners();
   }
 

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'dart:io';
-import 'dart:typed_data';
+
+void logIconStatus(String message) {
+  // ignore: avoid_print
+  print(message);
+}
 
 void main() async {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
-  final size = 512.0; // Kích thước icon 512x512
+  const size = 512.0; // Kích thước icon 512x512
 
   // Vẽ nền
   final bgPaint = Paint()..color = Colors.white;
-  canvas.drawRect(Rect.fromLTWH(0, 0, size, size), bgPaint);
+  canvas.drawRect(const Rect.fromLTWH(0, 0, size, size), bgPaint);
 
   // Vẽ X và O
   final xPaint = Paint()
@@ -25,19 +29,19 @@ void main() async {
 
   // Vẽ X
   canvas.drawLine(
-    Offset(size * 0.3, size * 0.3),
-    Offset(size * 0.7, size * 0.7),
+    const Offset(size * 0.3, size * 0.3),
+    const Offset(size * 0.7, size * 0.7),
     xPaint,
   );
   canvas.drawLine(
-    Offset(size * 0.7, size * 0.3),
-    Offset(size * 0.3, size * 0.7),
+    const Offset(size * 0.7, size * 0.3),
+    const Offset(size * 0.3, size * 0.7),
     xPaint,
   );
 
   // Vẽ O
   canvas.drawCircle(
-    Offset(size * 0.5, size * 0.5),
+    const Offset(size * 0.5, size * 0.5),
     size * 0.25,
     oPaint,
   );
@@ -53,8 +57,8 @@ void main() async {
         buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
     final file = File('assets/icon/icon.png');
     await file.writeAsBytes(imgData);
-    print('Icon saved successfully!');
+    logIconStatus('Icon saved successfully!');
   } else {
-    print('Failed to generate icon bytes');
+    logIconStatus('Failed to generate icon bytes');
   }
 }

@@ -37,8 +37,8 @@ int _scoreForPlayer(List<List<int>> board, int player) {
   return score;
 }
 
-int _evaluateLine(List<List<int>> board, int startR, int startC,
-    int dr, int dc, int player) {
+int _evaluateLine(
+    List<List<int>> board, int startR, int startC, int dr, int dc, int player) {
   const size = 15;
   // Collect a window of 6 cells
   final cells = <int>[];
@@ -58,7 +58,9 @@ int _evaluateLine(List<List<int>> board, int startR, int startC,
   if (playerCount == 4 && emptyCount == 2) return patternScores['open_four']!;
   if (playerCount == 4 && emptyCount == 1) return patternScores['closed_four']!;
   if (playerCount == 3 && emptyCount == 3) return patternScores['open_three']!;
-  if (playerCount == 3 && emptyCount == 2) return patternScores['closed_three']!;
+  if (playerCount == 3 && emptyCount == 2) {
+    return patternScores['closed_three']!;
+  }
   if (playerCount == 2 && emptyCount >= 4) return patternScores['open_two']!;
   return 0;
 }

@@ -23,8 +23,6 @@ class _AiGameView extends StatefulWidget {
 }
 
 class _AiGameViewState extends State<_AiGameView> {
-  bool _difficultySelected = false;
-
   @override
   void initState() {
     super.initState();
@@ -40,7 +38,6 @@ class _AiGameViewState extends State<_AiGameView> {
         provider: context.read<OfflineAiProvider>(),
         onSelected: () {
           Navigator.pop(context);
-          setState(() => _difficultySelected = true);
         },
       ),
     );
@@ -128,8 +125,8 @@ class _AiGameViewState extends State<_AiGameView> {
               Container(
                 padding: const EdgeInsets.all(12),
                 color: provider.currentTurn == 1
-                    ? Colors.blue.withOpacity(0.1)
-                    : Colors.red.withOpacity(0.1),
+                    ? Colors.blue.withValues(alpha: 0.1)
+                    : Colors.red.withValues(alpha: 0.1),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -154,7 +151,8 @@ class _AiGameViewState extends State<_AiGameView> {
                     height: cellSize * 15,
                     child: GridView.builder(
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 15,
                       ),
                       itemCount: 225,

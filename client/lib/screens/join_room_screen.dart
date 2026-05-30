@@ -45,7 +45,8 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
           }
         } else {
           setState(() {
-            _error = msg['payload']?['message'] as String? ?? 'Mã phòng không hợp lệ';
+            _error = msg['payload']?['message'] as String? ??
+                'Mã phòng không hợp lệ';
             _loading = false;
           });
         }
@@ -110,12 +111,14 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
                 onPressed: _loading ? null : _joinRoom,
                 icon: _loading
                     ? const SizedBox(
-                        width: 18, height: 18,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.check),
                 label: const Text('Tham gia'),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                 ),
               ),
               if (_error != null) ...[

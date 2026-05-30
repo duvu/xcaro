@@ -17,8 +17,7 @@ class _OpponentProfileScreenState extends State<OpponentProfileScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final userId =
-        ModalRoute.of(context)?.settings.arguments as String? ?? '';
+    final userId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
     _fetchProfile(userId);
   }
 
@@ -28,8 +27,7 @@ class _OpponentProfileScreenState extends State<OpponentProfileScreen> {
       _error = null;
     });
     try {
-      final data =
-          await context.read<ApiService>().getUserProfile(userId);
+      final data = await context.read<ApiService>().getUserProfile(userId);
       if (mounted) setState(() => _profile = data);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -76,8 +74,7 @@ class _ProfileBody extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 48,
-            backgroundImage:
-                avatar.isNotEmpty ? NetworkImage(avatar) : null,
+            backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
             child: avatar.isEmpty
                 ? Text(
                     username.isNotEmpty ? username[0].toUpperCase() : '?',
@@ -100,7 +97,8 @@ class _ProfileBody extends StatelessWidget {
               _Stat(label: 'Thắng', value: '$wins', color: Colors.green),
               _Stat(label: 'Thua', value: '$losses', color: Colors.red),
               _Stat(label: 'Hòa', value: '$draws', color: Colors.orange),
-              _Stat(label: 'Tỉ lệ thắng', value: '$winRate%', color: Colors.blue),
+              _Stat(
+                  label: 'Tỉ lệ thắng', value: '$winRate%', color: Colors.blue),
             ],
           ),
           const SizedBox(height: 24),

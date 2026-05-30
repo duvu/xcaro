@@ -37,8 +37,8 @@ class AiEngine {
       final x = move['x']!;
       final y = move['y']!;
       board[x][y] = aiPlayer;
-      final score =
-          minimax(board, searchDepth - 1, -999999999, 999999999, false, aiPlayer);
+      final score = minimax(
+          board, searchDepth - 1, -999999999, 999999999, false, aiPlayer);
       board[x][y] = 0;
       if (score > bestScore) {
         bestScore = score;

@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/quick_match_waiting_screen.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';
 import 'services/local_storage_service.dart';
@@ -33,29 +37,73 @@ void main() async {
   await themeProvider.loadTheme();
   final chatProvider = ChatProvider();
 
-  runApp(
-    MultiProvider(
-      providers: [
-        Provider<LocalStorageService>.value(value: storage),
-        Provider<ApiService>.value(value: apiService),
-        Provider<WebSocketService>.value(value: wsService),
-        ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
-        ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(apiService),
+  // Load app version once for error reports
+  String appVersion = '1.0.0';
+  try {
+    final info = await PackageInfo.fromPlatform();
+    appVersion = info.version;
+  } catch (_) {}
+
+  // Flutter framework error observer
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    apiService.submitErrorReport(
+      platform: defaultTargetPlatform.name.toLowerCase(),
+      version: appVersion,
+      errorType: 'flutter_error',
+      message: details.exceptionAsString(),
+      stackTrace: details.stack?.toString(),
+    );
+  };
+
+  // Uncaught async/platform errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    apiService.submitErrorReport(
+      platform: defaultTargetPlatform.name.toLowerCase(),
+      version: appVersion,
+      errorType: 'platform_error',
+      message: error.toString(),
+      stackTrace: stack.toString(),
+    );
+    return true;
+  };
+
+  runZonedGuarded(
+    () {
+      runApp(
+        MultiProvider(
+          providers: [
+            Provider<LocalStorageService>.value(value: storage),
+            Provider<ApiService>.value(value: apiService),
+            Provider<WebSocketService>.value(value: wsService),
+            ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+            ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
+            ChangeNotifierProvider(
+              create: (_) => AuthProvider(apiService),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => GameProvider(apiService, wsService, chatProvider),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => OfflineGameProvider(storage),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => LeaderboardProvider(),
+            ),
+          ],
+          child: const MyApp(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => GameProvider(apiService, wsService, chatProvider),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => OfflineGameProvider(storage),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => LeaderboardProvider(),
-        ),
-      ],
-      child: const MyApp(),
-    ),
+      );
+    },
+    (error, stack) {
+      apiService.submitErrorReport(
+        platform: defaultTargetPlatform.name.toLowerCase(),
+        version: appVersion,
+        errorType: 'zone_error',
+        message: error.toString(),
+        stackTrace: stack.toString(),
+      );
+    },
   );
 }
 
@@ -93,6 +141,7 @@ class MyApp extends StatelessWidget {
         '/leaderboard': (context) => const LeaderboardScreen(),
         '/opponent_profile': (context) => const OpponentProfileScreen(),
         '/onboarding': (context) => const OnboardingScreen(forceShow: true),
+        '/quick_match': (context) => const QuickMatchWaitingScreen(),
       },
     );
   }

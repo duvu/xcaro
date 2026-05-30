@@ -108,7 +108,8 @@ class ApiService {
     }
   }
 
-  Future<List<Game>> getGames({int page = 1, int limit = 20, String? userId}) async {
+  Future<List<Game>> getGames(
+      {int page = 1, int limit = 20, String? userId}) async {
     try {
       final Map<String, dynamic> queryParams = {
         'page': page,
@@ -126,7 +127,8 @@ class ApiService {
 
   Future<GameStats> getGameStats(String userId) async {
     try {
-      final response = await _dio.get('/games/stats', queryParameters: {'userId': userId});
+      final response =
+          await _dio.get('/games/stats', queryParameters: {'userId': userId});
       return GameStats.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
@@ -204,6 +206,41 @@ class ApiService {
       return Game.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  Future<void> submitReport(
+      String reportedUserId, String gameId, String reason) async {
+    try {
+      await _dio.post('/reports', data: {
+        'reported_user_id': reportedUserId,
+        'game_id': gameId,
+        'reason': reason,
+      });
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> submitErrorReport({
+    required String platform,
+    required String version,
+    required String errorType,
+    required String message,
+    String? stackTrace,
+  }) async {
+    try {
+      final st = stackTrace;
+      await _dio.post('/errors', data: {
+        'platform': platform,
+        'version': version,
+        'error_type': errorType,
+        'message': message,
+        if (st != null)
+          'stack_trace': st.length > 4096 ? st.substring(0, 4096) : st,
+      });
+    } catch (_) {
+      // fire-and-forget: ignore network errors to avoid cascading failures
     }
   }
 

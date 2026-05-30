@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/game_provider.dart';
 
 class ChatBox extends StatefulWidget {
   final Function(String) onSendMessage;
@@ -33,7 +31,6 @@ class _ChatBoxState extends State<ChatBox> {
 
   @override
   Widget build(BuildContext context) {
-    final gameProvider = context.watch<GameProvider>();
     final messages = <dynamic>[];
 
     return Container(

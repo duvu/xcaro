@@ -95,9 +95,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _StatChip(label: 'Thắng', value: _stats!.wins, color: Colors.green),
-                  _StatChip(label: 'Thua', value: _stats!.losses, color: Colors.red),
-                  _StatChip(label: 'Hòa', value: _stats!.draws, color: Colors.orange),
+                  _StatChip(
+                      label: 'Thắng', value: _stats!.wins, color: Colors.green),
+                  _StatChip(
+                      label: 'Thua', value: _stats!.losses, color: Colors.red),
+                  _StatChip(
+                      label: 'Hòa', value: _stats!.draws, color: Colors.orange),
                 ],
               ),
             ),
@@ -137,12 +140,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         }
                       }
                       final opponentName = game.players
-                          .where((p) => p.id != myId)
-                          .map((p) => p.username)
-                          .firstOrNull ?? 'Đối thủ';
+                              .where((p) => p.id != myId)
+                              .map((p) => p.username)
+                              .firstOrNull ??
+                          'Đối thủ';
                       return ListTile(
-                        leading: Icon(Icons.sports_esports,
-                            color: resultColor),
+                        leading: Icon(Icons.sports_esports, color: resultColor),
                         title: Text('vs $opponentName'),
                         subtitle: Text(
                             '${game.createdAt.day}/${game.createdAt.month}/${game.createdAt.year}'),

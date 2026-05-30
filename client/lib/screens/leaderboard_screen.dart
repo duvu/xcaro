@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/leaderboard_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/empty_state_widget.dart';
+import '../widgets/error_state_widget.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -33,25 +35,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (provider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(provider.error!),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.fetchLeaderboard(
-                        context.read<ApiService>()),
-                    child: const Text('Thử lại'),
-                  ),
-                ],
-              ),
+            return ErrorStateWidget(
+              message: 'Không thể tải bảng xếp hạng\n${provider.error!}',
+              onRetry: () =>
+                  provider.fetchLeaderboard(context.read<ApiService>()),
             );
           }
           if (provider.entries.isEmpty) {
-            return const Center(child: Text('Chưa có dữ liệu xếp hạng'));
+            return const EmptyStateWidget(
+              icon: Icons.leaderboard,
+              title: 'Chưa có người chơi',
+              subtitle: 'Hãy là người đầu tiên lên bảng xếp hạng!',
+            );
           }
           return ListView.builder(
             itemCount: provider.entries.length,

@@ -5,6 +5,9 @@ import '../providers/game_provider.dart';
 import '../providers/theme_provider.dart';
 import '../models/game_stats.dart';
 import '../services/api_service.dart';
+import '../services/websocket_service.dart';
+import '../widgets/empty_state_widget.dart';
+import 'quick_match_waiting_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,14 +26,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    final gameProvider = context.read<GameProvider>();
+    final auth = context.read<AuthProvider>();
+    final apiService = context.read<ApiService>();
+
     try {
-      await context.read<GameProvider>().loadGames();
+      await gameProvider.loadGames();
     } catch (_) {}
     try {
-      final auth = context.read<AuthProvider>();
       final userId = auth.currentUser?.id;
       if (userId != null) {
-        final stats = await context.read<ApiService>().getGameStats(userId);
+        final stats = await apiService.getGameStats(userId);
         if (mounted) setState(() => _stats = stats);
       }
     } catch (_) {}
@@ -76,6 +82,34 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          // WS connection status chip
+          StreamBuilder<bool>(
+            stream: context.read<WebSocketService>().isConnectedStream,
+            initialData: context.read<WebSocketService>().isConnected,
+            builder: (context, snap) {
+              final connected = snap.data ?? false;
+              return Container(
+                width: double.infinity,
+                color: connected
+                    ? Colors.green.shade50
+                    : Colors.orange.shade50,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.circle,
+                        size: 10,
+                        color: connected ? Colors.green : Colors.orange),
+                    const SizedBox(width: 6),
+                    Text(
+                      connected ? 'Đã kết nối' : 'Đang kết nối lại...',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           // Stats row
           if (_stats != null)
             Container(
@@ -84,18 +118,27 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _StatItem(label: 'Thắng', value: _stats!.wins, color: Colors.green),
-                  _StatItem(label: 'Thua', value: _stats!.losses, color: Colors.red),
-                  _StatItem(label: 'Hòa', value: _stats!.draws, color: Colors.orange),
-                  _StatItemText(label: 'Elo', value: '${_stats!.eloRating}', color: Colors.purple),
+                  _StatItem(
+                      label: 'Thắng', value: _stats!.wins, color: Colors.green),
+                  _StatItem(
+                      label: 'Thua', value: _stats!.losses, color: Colors.red),
+                  _StatItem(
+                      label: 'Hòa', value: _stats!.draws, color: Colors.orange),
+                  _StatItemText(
+                      label: 'Elo',
+                      value: '${_stats!.eloRating}',
+                      color: Colors.purple),
                   if (_stats!.rank > 0)
-                    _StatItemText(label: 'Hạng', value: '#${_stats!.rank}', color: Colors.indigo),
+                    _StatItemText(
+                        label: 'Hạng',
+                        value: '#${_stats!.rank}',
+                        color: Colors.indigo),
                 ],
               ),
             ),
-          // Action buttons
+          // Action buttons — row 1
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Row(
               children: [
                 Expanded(
@@ -118,8 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/ai_game'),
+                    onPressed: () => Navigator.pushNamed(context, '/ai_game'),
                     icon: const Icon(Icons.computer),
                     label: const Text('Chơi với máy'),
                     style: ElevatedButton.styleFrom(
@@ -129,6 +171,31 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          // Action buttons — row 2: Quick Match
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  context
+                      .read<WebSocketService>()
+                      .send({'type': 'quick_match_request', 'payload': {}});
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const QuickMatchWaitingScreen()),
+                  );
+                },
+                icon: const Icon(Icons.search),
+                label: const Text('Tìm đối thủ nhanh'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ),
           ),
           // Games list
@@ -141,7 +208,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 final games = gameProvider.myGames;
                 if (games == null || games.isEmpty) {
-                  return const Center(child: Text('Chưa có trận đấu nào'));
+                  return EmptyStateWidget(
+                    icon: Icons.sports_esports,
+                    title: 'Chưa có trận đấu nào',
+                    subtitle:
+                        'Tạo phòng hoặc tìm đối thủ nhanh để bắt đầu!',
+                    actionLabel: 'Tạo phòng',
+                    onAction: () =>
+                        Navigator.pushNamed(context, '/create_room'),
+                  );
                 }
 
                 return RefreshIndicator(
@@ -187,7 +262,8 @@ class _StatItem extends StatelessWidget {
   final int value;
   final Color color;
 
-  const _StatItem({required this.label, required this.value, required this.color});
+  const _StatItem(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +285,8 @@ class _StatItemText extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _StatItemText({required this.label, required this.value, required this.color});
+  const _StatItemText(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {

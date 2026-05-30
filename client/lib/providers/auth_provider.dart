@@ -34,7 +34,8 @@ class AuthProvider extends ChangeNotifier {
         _accessToken = tokens['access_token'];
         final newRefreshToken = tokens['refresh_token'];
         if (newRefreshToken != null) {
-          await _secureStorage.write(key: _refreshTokenKey, value: newRefreshToken);
+          await _secureStorage.write(
+              key: _refreshTokenKey, value: newRefreshToken);
         }
         _apiService.setAccessToken(_accessToken);
         _currentUser = await _apiService.getCurrentUser();

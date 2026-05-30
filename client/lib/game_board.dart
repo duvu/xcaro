@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as Math;
+import 'dart:math' as math;
 
 enum GameMode { pvp, pvc }
 
@@ -32,13 +32,6 @@ class GameBoard extends ChangeNotifier {
   int get oThinkingTime => _thinkingTimePlayer2;
   int get xMoves => _xMoves;
   int get oMoves => _oMoves;
-
-  Function(int fromRow, int fromCol, int toRow, int toCol)? _animationCallback;
-
-  void setAnimationCallback(
-      Function(int fromRow, int fromCol, int toRow, int toCol) callback) {
-    _animationCallback = callback;
-  }
 
   void setGameMode(GameMode mode) {
     _gameMode = mode;
@@ -186,12 +179,13 @@ class GameBoard extends ChangeNotifier {
         int emptyCount = 0;
 
         for (int k = 0; k < 5; k++) {
-          if (_board[i][j + k] == 'X')
+          if (_board[i][j + k] == 'X') {
             xCount++;
-          else if (_board[i][j + k] == 'O')
+          } else if (_board[i][j + k] == 'O') {
             oCount++;
-          else
+          } else {
             emptyCount++;
+          }
         }
 
         score += _evaluateSequence(xCount, oCount, emptyCount);
@@ -206,12 +200,13 @@ class GameBoard extends ChangeNotifier {
         int emptyCount = 0;
 
         for (int k = 0; k < 5; k++) {
-          if (_board[i + k][j] == 'X')
+          if (_board[i + k][j] == 'X') {
             xCount++;
-          else if (_board[i + k][j] == 'O')
+          } else if (_board[i + k][j] == 'O') {
             oCount++;
-          else
+          } else {
             emptyCount++;
+          }
         }
 
         score += _evaluateSequence(xCount, oCount, emptyCount);
@@ -226,12 +221,13 @@ class GameBoard extends ChangeNotifier {
         int emptyCount = 0;
 
         for (int k = 0; k < 5; k++) {
-          if (_board[i + k][j + k] == 'X')
+          if (_board[i + k][j + k] == 'X') {
             xCount++;
-          else if (_board[i + k][j + k] == 'O')
+          } else if (_board[i + k][j + k] == 'O') {
             oCount++;
-          else
+          } else {
             emptyCount++;
+          }
         }
 
         score += _evaluateSequence(xCount, oCount, emptyCount);
@@ -246,12 +242,13 @@ class GameBoard extends ChangeNotifier {
         int emptyCount = 0;
 
         for (int k = 0; k < 5; k++) {
-          if (_board[i + k][j - k] == 'X')
+          if (_board[i + k][j - k] == 'X') {
             xCount++;
-          else if (_board[i + k][j - k] == 'O')
+          } else if (_board[i + k][j - k] == 'O') {
             oCount++;
-          else
+          } else {
             emptyCount++;
+          }
         }
 
         score += _evaluateSequence(xCount, oCount, emptyCount);
@@ -299,10 +296,10 @@ class GameBoard extends ChangeNotifier {
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
         if (_board[i][j].isNotEmpty) {
-          minRow = Math.min(minRow, Math.max(0, i - 2));
-          maxRow = Math.min(size - 1, Math.max(maxRow, i + 2));
-          minCol = Math.min(minCol, Math.max(0, j - 2));
-          maxCol = Math.min(size - 1, Math.max(maxCol, j + 2));
+          minRow = math.min(minRow, math.max(0, i - 2));
+          maxRow = math.min(size - 1, math.max(maxRow, i + 2));
+          minCol = math.min(minCol, math.max(0, j - 2));
+          maxCol = math.min(size - 1, math.max(maxCol, j + 2));
         }
       }
     }

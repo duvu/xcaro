@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
 
@@ -89,28 +90,32 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.add_circle_outline, size: 80, color: Colors.deepPurple),
+              const Icon(Icons.add_circle_outline,
+                  size: 80, color: Colors.deepPurple),
               const SizedBox(height: 24),
               if (_roomCode == null) ...[
                 ElevatedButton.icon(
                   onPressed: _loading ? null : _createRoom,
                   icon: _loading
                       ? const SizedBox(
-                          width: 18, height: 18,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.add),
                   label: const Text('Tạo phòng mới'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 14),
                   ),
                 ),
               ] else ...[
                 const Text('Mã phòng của bạn:', style: TextStyle(fontSize: 18)),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
+                    color: Colors.deepPurple.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.deepPurple),
                   ),
@@ -124,12 +129,22 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                // Share invite button
+                OutlinedButton.icon(
+                  onPressed: () => Share.share(
+                    'Tham gia phòng XCaro của mình: $_roomCode\nxcaro://room/$_roomCode',
+                  ),
+                  icon: const Icon(Icons.share),
+                  label: const Text('Chia sẻ mã phòng'),
+                ),
                 const SizedBox(height: 24),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 20, height: 20,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     SizedBox(width: 12),

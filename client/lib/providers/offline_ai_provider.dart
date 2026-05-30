@@ -98,7 +98,10 @@ class OfflineAiProvider extends ChangeNotifier {
       int count = 1;
       // forward
       int r = x + d[0], c = y + d[1];
-      while (r >= 0 && r < boardSize && c >= 0 && c < boardSize &&
+      while (r >= 0 &&
+          r < boardSize &&
+          c >= 0 &&
+          c < boardSize &&
           _board[r][c] == player) {
         count++;
         r += d[0];
@@ -107,7 +110,10 @@ class OfflineAiProvider extends ChangeNotifier {
       // backward
       r = x - d[0];
       c = y - d[1];
-      while (r >= 0 && r < boardSize && c >= 0 && c < boardSize &&
+      while (r >= 0 &&
+          r < boardSize &&
+          c >= 0 &&
+          c < boardSize &&
           _board[r][c] == player) {
         count++;
         r -= d[0];
@@ -127,4 +133,3 @@ class OfflineAiProvider extends ChangeNotifier {
     return true;
   }
 }
-

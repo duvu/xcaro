@@ -66,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 controller: _pageController,
                 onPageChanged: _onPageChanged,
                 children: [
-                  _OnboardingPage(
+                  const _OnboardingPage(
                     icon: Icons.extension,
                     title: 'Cờ Caro là gì?',
                     description:
@@ -74,7 +74,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         'Mỗi người lần lượt đặt quân cờ của mình (X hoặc O). '
                         'Mục tiêu là tạo ra 5 quân liên tiếp trước đối thủ.',
                   ),
-                  _OnboardingPage(
+                  const _OnboardingPage(
                     icon: Icons.touch_app,
                     title: 'Cách đặt quân',
                     description:
@@ -202,7 +202,8 @@ class _WinConditionPage extends StatelessWidget {
                     child: const Center(
                       child: Text('X',
                           style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold)),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),

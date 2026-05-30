@@ -44,9 +44,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             title: const Text('Kiểm tra email của bạn'),
-            content: const Text(
-                'Chúng tôi đã gửi link xác minh tới email của bạn. '
-                'Vui lòng xác minh trước khi chơi online.'),
+            content:
+                const Text('Chúng tôi đã gửi link xác minh tới email của bạn. '
+                    'Vui lòng xác minh trước khi chơi online.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),

@@ -36,9 +36,7 @@ class GameBoard extends StatelessWidget {
 
             return _BoardCell(
               value: value,
-              onTap: enabled && value.isEmpty
-                  ? () => onTap(x, y)
-                  : null,
+              onTap: enabled && value.isEmpty ? () => onTap(x, y) : null,
             );
           },
         ),
@@ -120,7 +118,7 @@ class _BoardCellState extends State<_BoardCell>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: color.withOpacity(0.4),
+                          color: color.withValues(alpha: 0.4),
                           blurRadius: 4,
                           spreadRadius: 1,
                         )
