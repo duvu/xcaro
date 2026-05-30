@@ -39,7 +39,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _passwordController.text,
           );
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            title: const Text('Kiểm tra email của bạn'),
+            content: const Text(
+                'Chúng tôi đã gửi link xác minh tới email của bạn. '
+                'Vui lòng xác minh trước khi chơi online.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
       if (mounted) {

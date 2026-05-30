@@ -1,45 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:confetti/confetti.dart';
-import 'package:flame/game.dart';
-import 'dart:math' show pi;
-import 'game_board.dart';
-import 'game/caro_game.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';
 import 'services/local_storage_service.dart';
-import 'services/connectivity_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/game_provider.dart';
 import 'providers/offline_game_provider.dart';
+import 'providers/theme_provider.dart';
+import 'providers/leaderboard_provider.dart';
+import 'providers/chat_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/offline_game_screen.dart';
+import 'screens/create_room_screen.dart';
+import 'screens/join_room_screen.dart';
+import 'screens/ai_game_screen.dart';
+import 'screens/history_screen.dart';
+import 'screens/leaderboard_screen.dart';
+import 'screens/opponent_profile_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   final storage = LocalStorageService(prefs);
-  final apiService = ApiService(storage);
-  final gameBoard = GameBoard();
+  final apiService = ApiService();
+  final wsService = WebSocketService();
+  final themeProvider = ThemeProvider();
+  await themeProvider.loadTheme();
+  final chatProvider = ChatProvider();
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<LocalStorageService>.value(value: storage),
+        Provider<ApiService>.value(value: apiService),
+        Provider<WebSocketService>.value(value: wsService),
+        ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+        ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(apiService, storage),
+          create: (_) => AuthProvider(apiService),
         ),
         ChangeNotifierProvider(
-          create: (_) => GameProvider(apiService),
+          create: (_) => GameProvider(apiService, wsService, chatProvider),
         ),
         ChangeNotifierProvider(
           create: (_) => OfflineGameProvider(storage),
         ),
         ChangeNotifierProvider(
-          create: (_) => GameBoard(),
+          create: (_) => LeaderboardProvider(),
         ),
       ],
       child: const MyApp(),
@@ -52,276 +64,112 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+
     return MaterialApp(
       title: 'XCaro',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      initialRoute: '/',
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple, brightness: Brightness.dark),
+        useMaterial3: true,
+      ),
+      themeMode: themeProvider.themeMode,
+      home: const _AppRoot(),
       routes: {
-        '/': (context) => const GameScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
         '/game': (context) => const GameScreen(),
+        '/online_game': (context) => const GameScreen(),
+        '/create_room': (context) => const CreateRoomScreen(),
+        '/join_room': (context) => const JoinRoomScreen(),
+        '/ai_game': (context) => const AiGameScreen(),
+        '/history': (context) => const HistoryScreen(),
+        '/offline': (context) => const OfflineGameScreen(),
+        '/leaderboard': (context) => const LeaderboardScreen(),
+        '/opponent_profile': (context) => const OpponentProfileScreen(),
+        '/onboarding': (context) => const OnboardingScreen(forceShow: true),
       },
     );
   }
 }
 
-class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+/// Root widget that shows splash while AuthProvider initializes,
+/// then routes to Home or Login based on authentication state.
+class _AppRoot extends StatelessWidget {
+  const _AppRoot();
 
   @override
-  State<GameScreen> createState() => _GameScreenState();
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        if (authProvider.isLoading) {
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'XCaro',
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  CircularProgressIndicator(),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (authProvider.isAuthenticated) {
+          return const _OnboardingGate(child: HomeScreen());
+        } else {
+          return const LoginScreen();
+        }
+      },
+    );
+  }
 }
 
-class _GameScreenState extends State<GameScreen> {
-  late ConfettiController _confettiController;
-  late CaroGame _game;
+class _OnboardingGate extends StatefulWidget {
+  final Widget child;
+
+  const _OnboardingGate({required this.child});
+
+  @override
+  State<_OnboardingGate> createState() => _OnboardingGateState();
+}
+
+class _OnboardingGateState extends State<_OnboardingGate> {
+  bool? _onboardingDone;
 
   @override
   void initState() {
     super.initState();
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 5));
-    final gameBoard = context.read<GameBoard>();
-    _game = CaroGame(gameBoard);
-
-    // Đăng ký callback cho animation
-    gameBoard.setAnimationCallback((fromRow, fromCol, toRow, toCol) {
-      _game.centerBoard(fromRow, fromCol, toRow, toCol);
-    });
+    _checkOnboarding();
   }
 
-  @override
-  void dispose() {
-    _confettiController.dispose();
-    super.dispose();
-  }
-
-  void _checkGameState(GameBoard gameBoard) {
-    if (gameBoard.isGameOver &&
-        _confettiController.state == ConfettiControllerState.stopped) {
-      _confettiController.play();
-    }
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('onboarding_complete') ?? false;
+    if (mounted) setState(() => _onboardingDone = done);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Caro Game'),
-        centerTitle: true,
-        leading: PopupMenuButton<GameMode>(
-          icon: const Icon(Icons.gamepad),
-          onSelected: (GameMode mode) {
-            context.read<GameBoard>().setGameMode(mode);
-          },
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<GameMode>>[
-            const PopupMenuItem<GameMode>(
-              value: GameMode.pvp,
-              child: Row(
-                children: [
-                  Icon(Icons.people, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Text('Chơi với người'),
-                ],
-              ),
-            ),
-            const PopupMenuItem<GameMode>(
-              value: GameMode.pvc,
-              child: Row(
-                children: [
-                  Icon(Icons.computer, color: Colors.green),
-                  SizedBox(width: 8),
-                  Text('Chơi với máy'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Consumer<AuthProvider>(
-            builder: (context, authProvider, child) {
-              if (!authProvider.isAuthenticated) {
-                return TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/login'),
-                  child: const Text('Đăng nhập',
-                      style: TextStyle(color: Colors.white)),
-                );
-              } else {
-                return Row(
-                  children: [
-                    Text(authProvider.currentUser?.username ?? '',
-                        style: const TextStyle(color: Colors.white)),
-                    IconButton(
-                      icon: const Icon(Icons.logout),
-                      onPressed: () {
-                        authProvider.logout();
-                      },
-                    ),
-                  ],
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<GameBoard>().resetGame();
-              if (_confettiController.state ==
-                  ConfettiControllerState.playing) {
-                _confettiController.stop();
-              }
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Consumer<GameBoard>(
-                  builder: (context, gameBoard, child) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _checkGameState(gameBoard);
-                    });
-                    return const SizedBox.shrink();
-                  },
-                ),
-                Expanded(
-                  flex: 6,
-                  child: GameWidget(
-                    game: _game,
-                  ),
-                ),
-                const Expanded(flex: 1, child: SizedBox()),
-              ],
-            ),
-            // Thông tin người chơi X (góc trái)
-            Positioned(
-              left: 20,
-              top: 20,
-              child: Consumer<GameBoard>(
-                builder: (context, gameBoard, child) {
-                  return _buildPlayerInfo(
-                    name: 'Người chơi X',
-                    symbol: 'X',
-                    thinkingTime: gameBoard.xThinkingTime,
-                    moves: gameBoard.xMoves,
-                    isCurrentPlayer: gameBoard.currentPlayer == 'X',
-                    color: Colors.blue,
-                  );
-                },
-              ),
-            ),
-            // Thông tin người chơi O (góc phải)
-            Positioned(
-              right: 20,
-              top: 20,
-              child: Consumer<GameBoard>(
-                builder: (context, gameBoard, child) {
-                  return _buildPlayerInfo(
-                    name: gameBoard.gameMode == GameMode.pvc
-                        ? 'Máy'
-                        : 'Người chơi O',
-                    symbol: 'O',
-                    thinkingTime: gameBoard.oThinkingTime,
-                    moves: gameBoard.oMoves,
-                    isCurrentPlayer: gameBoard.currentPlayer == 'O',
-                    color: Colors.red,
-                  );
-                },
-              ),
-            ),
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConfettiWidget(
-                confettiController: _confettiController,
-                blastDirection: pi / 2,
-                maxBlastForce: 7,
-                minBlastForce: 2,
-                emissionFrequency: 0.08,
-                numberOfParticles: 50,
-                gravity: 0.2,
-                shouldLoop: false,
-                colors: const [
-                  Colors.red,
-                  Colors.blue,
-                  Colors.yellow,
-                  Colors.green,
-                  Colors.purple,
-                  Colors.orange,
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerInfo({
-    required String name,
-    required String symbol,
-    required int thinkingTime,
-    required int moves,
-    required bool isCurrentPlayer,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCurrentPlayer ? color : Colors.grey,
-          width: 2,
-        ),
-        boxShadow: isCurrentPlayer
-            ? [
-                BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                )
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            name,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Quân cờ: $symbol',
-            style: TextStyle(
-              fontSize: 14,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Thời gian: ${(thinkingTime / 1000).toStringAsFixed(1)}s',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Số nước: $moves',
-            style: const TextStyle(fontSize: 14),
-          ),
-        ],
-      ),
-    );
+    if (_onboardingDone == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!_onboardingDone!) {
+      return const OnboardingScreen();
+    }
+    return widget.child;
   }
 }

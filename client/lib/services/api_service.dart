@@ -1,16 +1,14 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
-import '../services/local_storage_service.dart';
 import '../models/user.dart';
 import '../models/game.dart';
+import '../models/game_stats.dart';
 
 class ApiService {
   final Dio _dio;
-  final LocalStorageService _storage;
+  String? _accessToken;
 
-  ApiService(this._storage)
+  ApiService()
       : _dio = Dio(BaseOptions(
           baseUrl: AppConfig.baseUrl,
           connectTimeout: const Duration(seconds: 5),
@@ -18,41 +16,45 @@ class ApiService {
         )) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
-        final token = _storage.getToken();
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
+        if (_accessToken != null) {
+          options.headers['Authorization'] = 'Bearer $_accessToken';
         }
         return handler.next(options);
-      },
-      onError: (error, handler) {
-        if (error.response?.statusCode == 401) {
-          _storage.clear();
-        }
-        return handler.next(error);
       },
     ));
   }
 
-  Future<User> login(String username, String password) async {
+  void setAccessToken(String? token) {
+    _accessToken = token;
+  }
+
+  String? get accessToken => _accessToken;
+
+  /// Returns {access_token, refresh_token, user}
+  Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await _dio.post('/auth/login', data: {
         'username': username,
         'password': password,
       });
 
-      final token = response.data['token'] as String;
-      await _storage.saveToken(token);
+      final accessToken = response.data['access_token'] as String;
+      final refreshToken = response.data['refresh_token'] as String;
+      final user = User.fromJson(response.data['user'] as Map<String, dynamic>);
 
-      final user = User.fromJson(response.data['user']);
-      await _storage.saveUser(user);
-
-      return user;
+      return {
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'user': user,
+      };
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
-  Future<User> register(String username, String email, String password) async {
+  /// Returns {access_token, refresh_token, user}
+  Future<Map<String, dynamic>> register(
+      String username, String email, String password) async {
     try {
       final response = await _dio.post('/auth/register', data: {
         'username': username,
@@ -60,13 +62,30 @@ class ApiService {
         'password': password,
       });
 
-      final token = response.data['token'] as String;
-      await _storage.saveToken(token);
+      final accessToken = response.data['access_token'] as String;
+      final refreshToken = response.data['refresh_token'] as String;
+      final user = User.fromJson(response.data['user'] as Map<String, dynamic>);
 
-      final user = User.fromJson(response.data['user']);
-      await _storage.saveUser(user);
+      return {
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'user': user,
+      };
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
 
-      return user;
+  /// Returns {access_token, refresh_token}
+  Future<Map<String, String>> refreshToken(String refreshToken) async {
+    try {
+      final response = await _dio.post('/auth/refresh', data: {
+        'refresh_token': refreshToken,
+      });
+      return {
+        'access_token': response.data['access_token'] as String,
+        'refresh_token': response.data['refresh_token'] as String,
+      };
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -74,10 +93,8 @@ class ApiService {
 
   Future<User> getCurrentUser() async {
     try {
-      final response = await _dio.get('/profile');
-      final user = User.fromJson(response.data);
-      await _storage.saveUser(user);
-      return user;
+      final response = await _dio.get('/users/profile');
+      return User.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -86,17 +103,75 @@ class ApiService {
   Future<void> logout() async {
     try {
       await _dio.post('/auth/logout');
-    } finally {
-      await _storage.clear();
+    } catch (_) {
+      // best-effort
     }
   }
 
-  Future<List<Game>> getGames() async {
+  Future<List<Game>> getGames({int page = 1, int limit = 20, String? userId}) async {
     try {
-      final response = await _dio.get('/games');
+      final Map<String, dynamic> queryParams = {
+        'page': page,
+        'limit': limit,
+      };
+      if (userId != null) queryParams['userId'] = userId;
+      final response = await _dio.get('/games', queryParameters: queryParams);
       return (response.data as List)
-          .map((game) => Game.fromJson(game))
+          .map((game) => Game.fromJson(game as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<GameStats> getGameStats(String userId) async {
+    try {
+      final response = await _dio.get('/games/stats', queryParameters: {'userId': userId});
+      return GameStats.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getLeaderboard() async {
+    try {
+      final resp = await _dio.get('/leaderboard');
+      return resp.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getUserProfile(String userId) async {
+    try {
+      final resp = await _dio.get('/users/$userId/profile');
+      return resp.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> resendVerification() async {
+    try {
+      await _dio.post('/auth/resend-verification');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> createRoom() async {
+    try {
+      final response = await _dio.post('/rooms');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> joinRoom(String code) async {
+    try {
+      final response = await _dio.post('/rooms/$code/join');
+      return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -105,7 +180,7 @@ class ApiService {
   Future<Game> createGame() async {
     try {
       final response = await _dio.post('/games');
-      return Game.fromJson(response.data);
+      return Game.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -114,7 +189,7 @@ class ApiService {
   Future<Game> joinGame(String gameId) async {
     try {
       final response = await _dio.post('/games/$gameId/join');
-      return Game.fromJson(response.data);
+      return Game.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -126,15 +201,21 @@ class ApiService {
         'x': x,
         'y': y,
       });
-      return Game.fromJson(response.data);
+      return Game.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
   String _handleError(DioException e) {
-    if (e.response?.data != null && e.response!.data['error'] != null) {
-      return e.response!.data['error'];
+    if (e.response?.data != null) {
+      final data = e.response!.data;
+      if (data is Map && data['error'] != null) {
+        return data['error'].toString();
+      }
+      if (data is Map && data['message'] != null) {
+        return data['message'].toString();
+      }
     }
     return 'Có lỗi xảy ra. Vui lòng thử lại sau.';
   }

@@ -4,7 +4,6 @@ import '../models/game.dart';
 import '../models/user.dart';
 import '../services/local_storage_service.dart';
 import '../models/chat_message.dart' as chat;
-import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 
 class OfflineGameProvider extends ChangeNotifier {
@@ -19,7 +18,7 @@ class OfflineGameProvider extends ChangeNotifier {
   String? _winner;
   bool _isGameOver = false;
   List<chat.ChatMessage> _messages = [];
-  final _uuid = const Uuid();
+
 
   OfflineGameProvider(this._storage) {
     _init();
@@ -302,7 +301,7 @@ class OfflineGameProvider extends ChangeNotifier {
 
   void addMessage(String content) {
     _messages.add(chat.ChatMessage(
-      id: _uuid.v4(),
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       sender: 'Người chơi',
       content: content,
       timestamp: DateTime.now(),

@@ -1,33 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/api_service.dart';
-import '../services/local_storage_service.dart';
 import '../models/user.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService;
-  final LocalStorageService _storage;
+  final FlutterSecureStorage _secureStorage;
+
   User? _currentUser;
+  String? _accessToken;
   bool _isLoading = false;
 
-  AuthProvider(this._apiService, this._storage) {
+  static const _refreshTokenKey = 'refresh_token';
+
+  AuthProvider(this._apiService)
+      : _secureStorage = const FlutterSecureStorage() {
     _init();
   }
 
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
+  String? get accessToken => _accessToken;
 
   Future<void> _init() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final token = _storage.getToken();
-      if (token != null) {
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+      if (refreshToken != null) {
+        final tokens = await _apiService.refreshToken(refreshToken);
+        _accessToken = tokens['access_token'];
+        final newRefreshToken = tokens['refresh_token'];
+        if (newRefreshToken != null) {
+          await _secureStorage.write(key: _refreshTokenKey, value: newRefreshToken);
+        }
+        _apiService.setAccessToken(_accessToken);
         _currentUser = await _apiService.getCurrentUser();
       }
     } catch (e) {
-      await _storage.clear();
+      await _secureStorage.delete(key: _refreshTokenKey);
+      _accessToken = null;
+      _currentUser = null;
+      _apiService.setAccessToken(null);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -39,7 +55,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _currentUser = await _apiService.register(username, email, password);
+      final result = await _apiService.register(username, email, password);
+      _accessToken = result['access_token'] as String;
+      final refreshToken = result['refresh_token'] as String;
+      _currentUser = result['user'] as User;
+      _apiService.setAccessToken(_accessToken);
+      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
       notifyListeners();
     } finally {
       _isLoading = false;
@@ -52,7 +73,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _currentUser = await _apiService.login(username, password);
+      final result = await _apiService.login(username, password);
+      _accessToken = result['access_token'] as String;
+      final refreshToken = result['refresh_token'] as String;
+      _currentUser = result['user'] as User;
+      _apiService.setAccessToken(_accessToken);
+      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
       notifyListeners();
     } finally {
       _isLoading = false;
@@ -66,9 +92,13 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       await _apiService.logout();
-      _currentUser = null;
-      notifyListeners();
+    } catch (_) {
+      // best-effort
     } finally {
+      await _secureStorage.delete(key: _refreshTokenKey);
+      _accessToken = null;
+      _currentUser = null;
+      _apiService.setAccessToken(null);
       _isLoading = false;
       notifyListeners();
     }

@@ -34,7 +34,7 @@ class _ChatBoxState extends State<ChatBox> {
   @override
   Widget build(BuildContext context) {
     final gameProvider = context.watch<GameProvider>();
-    final messages = gameProvider.currentGame?.messages ?? [];
+    final messages = <dynamic>[];
 
     return Container(
       height: 200,
