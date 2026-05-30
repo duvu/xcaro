@@ -449,3 +449,35 @@ func (h *Handler) ExportGameHistory(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Data(http.StatusOK, contentType, data)
 }
+
+func (h *Handler) GetGameRecords(c *gin.Context) {
+	userID := c.GetString("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+
+	records, err := h.service.GetGameRecords(c.Request.Context(), userID, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, records)
+}
+
+func (h *Handler) GetGameRecordStats(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	stats, err := h.service.GetGameRecordStats(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}

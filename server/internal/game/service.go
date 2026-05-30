@@ -431,6 +431,27 @@ func (s *Service) GetGameStats(ctx context.Context, req *models.GetGameStatsRequ
 		}
 	}
 
+	var userDoc bson.M
+	if err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&userDoc); err == nil {
+		elo := 0
+		if v, ok := userDoc["elo_rating"]; ok {
+			switch n := v.(type) {
+			case int32:
+				elo = int(n)
+			case int64:
+				elo = int(n)
+			case int:
+				elo = n
+			}
+		}
+		if elo == 0 {
+			elo = 1200
+		}
+		stats.EloRating = elo
+		rank, _ := s.db.Collection("users").CountDocuments(ctx, bson.M{"elo_rating": bson.M{"$gt": elo}})
+		stats.Rank = rank + 1
+	}
+
 	return stats, nil
 }
 
@@ -647,4 +668,95 @@ func (s *Service) ExportGameHistory(ctx context.Context, req *models.ExportHisto
 	default:
 		return nil, errors.New("định dạng không được hỗ trợ")
 	}
+}
+
+func (s *Service) GetGameRecords(ctx context.Context, userID string, page, limit int) ([]*models.GameRecord, error) {
+	skip := int64((page - 1) * limit)
+	filter := bson.M{
+		"$or": []bson.M{
+			{"player_x": userID},
+			{"player_o": userID},
+		},
+	}
+
+	cursor, err := s.db.Collection("game_records").Find(ctx, filter,
+		options.Find().SetSkip(skip).SetLimit(int64(limit)).SetSort(bson.D{{Key: "created_at", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var records []*models.GameRecord
+	if err := cursor.All(ctx, &records); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func (s *Service) GetGameRecordStats(ctx context.Context, userID string) (*models.GameRecordStats, error) {
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				"$or": []bson.M{
+					{"player_x": userID},
+					{"player_o": userID},
+				},
+			},
+		},
+		{
+			"$group": bson.M{
+				"_id": nil,
+				"wins": bson.M{"$sum": bson.M{"$cond": []interface{}{
+					bson.M{"$eq": []interface{}{"$winner", userID}}, 1, 0,
+				}}},
+				"draws": bson.M{"$sum": bson.M{"$cond": []interface{}{
+					bson.M{"$eq": []interface{}{"$result", "draw"}}, 1, 0,
+				}}},
+				"total": bson.M{"$sum": 1},
+			},
+		},
+	}
+
+	cursor, err := s.db.Collection("game_records").Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var result []bson.M
+	if err := cursor.All(ctx, &result); err != nil {
+		return nil, err
+	}
+
+	stats := &models.GameRecordStats{}
+	if len(result) > 0 {
+		row := result[0]
+		if v, ok := row["wins"]; ok {
+			switch n := v.(type) {
+			case int32:
+				stats.Wins = int64(n)
+			case int64:
+				stats.Wins = n
+			}
+		}
+		if v, ok := row["draws"]; ok {
+			switch n := v.(type) {
+			case int32:
+				stats.Draws = int64(n)
+			case int64:
+				stats.Draws = n
+			}
+		}
+		var total int64
+		if v, ok := row["total"]; ok {
+			switch n := v.(type) {
+			case int32:
+				total = int64(n)
+			case int64:
+				total = n
+			}
+		}
+		stats.Losses = total - stats.Wins - stats.Draws
+	}
+	return stats, nil
 }

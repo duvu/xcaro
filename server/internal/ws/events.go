@@ -1,35 +1,37 @@
 package ws
 
-// Event types
 const (
-	// Game events
-	EventGameState = "game_state" // Cập nhật trạng thái game
-	EventGameStart = "game_start" // Game bắt đầu
-	EventGameEnd   = "game_end"   // Game kết thúc
-	EventGameMove  = "game_move"  // Nước đi mới
+	EventGameState = "game_state"
+	EventGameStart = "game_start"
+	EventGameEnd   = "game_end"
+	EventGameMove  = "game_move"
+	EventGameOver  = "game_over"
 
-	// Room events
-	EventRoomUpdate  = "room_update"  // Cập nhật thông tin phòng
-	EventPlayerJoin  = "player_join"  // Người chơi tham gia
-	EventPlayerLeave = "player_leave" // Người chơi rời đi
-	EventChatMessage = "chat_message" // Tin nhắn chat
+	EventJoinRoom   = "join_room"
+	EventLeaveRoom  = "leave_room"
+	EventMakeMove   = "make_move"
+	EventResign     = "resign"
 
-	// Stream events
-	EventStreamStart  = "stream_start"  // Stream bắt đầu
-	EventStreamStop   = "stream_stop"   // Stream kết thúc
-	EventStreamStatus = "stream_status" // Cập nhật trạng thái stream
+	EventRoomUpdate  = "room_update"
+	EventPlayerJoin  = "player_join"
+	EventPlayerLeave = "player_leave"
+	EventChatMessage = "chat_message"
 
-	// System events
-	EventError = "error" // Thông báo lỗi
-	EventPing  = "ping"  // Kiểm tra kết nối
-	EventPong  = "pong"  // Phản hồi kiểm tra kết nối
+	EventStreamStart  = "stream_start"
+	EventStreamStop   = "stream_stop"
+	EventStreamStatus = "stream_status"
 
-	MessageTypeMove = "move"
-	MessageTypeChat = "chat"
-	MessageTypeOffer = "offer"
-	MessageTypeAnswer = "answer"
+	EventError = "error"
+	EventPing  = "ping"
+	EventPong  = "pong"
+
+	MessageTypeMove         = "move"
+	MessageTypeChat         = "chat"
+	MessageTypeOffer        = "offer"
+	MessageTypeAnswer       = "answer"
 	MessageTypeIceCandidate = "ice-candidate"
 )
+
 
 // WSMessage định nghĩa cấu trúc message WebSocket
 type WSMessage struct {

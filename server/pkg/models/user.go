@@ -50,23 +50,29 @@ var RolePermissions = map[Role][]Permission{
 }
 
 type User struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Username    string             `json:"username" bson:"username"`
-	Email       string             `json:"email" bson:"email"`
-	Password    string             `json:"-" bson:"password"` // Không trả về password trong JSON
-	Role        Role               `json:"role" bson:"role"`
-	IsBanned    bool               `json:"is_banned" bson:"is_banned"`
-	BanReason   string             `json:"ban_reason,omitempty" bson:"ban_reason,omitempty"`
-	FullName    string             `json:"full_name" bson:"full_name"`
-	Avatar      string             `json:"avatar" bson:"avatar"`
-	DateOfBirth time.Time          `json:"date_of_birth" bson:"date_of_birth"`
-	PhoneNumber string             `json:"phone_number" bson:"phone_number"`
-	Bio         string             `json:"bio" bson:"bio"`
-	GamesPlayed int                `json:"games_played" bson:"games_played"`
-	GamesWon    int                `json:"games_won" bson:"games_won"`
-	Rating      int                `json:"rating" bson:"rating"`
-	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
+	ID                   primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Username             string             `json:"username" bson:"username"`
+	Email                string             `json:"email" bson:"email"`
+	Password             string             `json:"-" bson:"password"` // Không trả về password trong JSON
+	Role                 Role               `json:"role" bson:"role"`
+	IsBanned             bool               `json:"is_banned" bson:"is_banned"`
+	BanReason            string             `json:"ban_reason,omitempty" bson:"ban_reason,omitempty"`
+	FullName             string             `json:"full_name" bson:"full_name"`
+	Avatar               string             `json:"avatar" bson:"avatar"`
+	DateOfBirth          time.Time          `json:"date_of_birth" bson:"date_of_birth"`
+	PhoneNumber          string             `json:"phone_number" bson:"phone_number"`
+	Bio                  string             `json:"bio" bson:"bio"`
+	GamesPlayed          int                `json:"games_played" bson:"games_played"`
+	GamesWon             int                `json:"games_won" bson:"games_won"`
+	Rating               int                `json:"rating" bson:"rating"`
+	EmailVerified        bool               `json:"email_verified" bson:"email_verified"`
+	EmailVerifyToken     string             `json:"-" bson:"email_verify_token,omitempty"`
+	EmailVerifyExpiresAt time.Time          `json:"-" bson:"email_verify_expires_at,omitempty"`
+	EloRating            int                `json:"elo_rating" bson:"elo_rating"`
+	RefreshToken         string             `json:"-" bson:"refresh_token,omitempty"`
+	RefreshTokenExpiresAt time.Time         `json:"-" bson:"refresh_token_expires_at,omitempty"`
+	CreatedAt            time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt            time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 // HasPermission kiểm tra xem user có quyền cụ thể không
@@ -127,6 +133,16 @@ type BanUserRequest struct {
 
 type UnbanUserRequest struct {
 	UserID primitive.ObjectID `json:"user_id" binding:"required"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type AuthResponse struct {
+	User         *User  `json:"user"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type ListUsersResponse struct {

@@ -2,7 +2,6 @@ package game
 
 import "github.com/gin-gonic/gin"
 
-// RegisterRoutes đăng ký các route cho game
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	games := r.Group("/games")
 	{
@@ -16,5 +15,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		games.GET("/leaderboard", h.GetLeaderboard)
 		games.GET("/search", h.SearchGames)
 		games.GET("/export", h.ExportGameHistory)
+		games.GET("/records", h.GetGameRecords)
+		games.GET("/records/stats", h.GetGameRecordStats)
 	}
 }

@@ -2,9 +2,14 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
+	"github.com/duvu/xcaro/server/internal/email"
 	"github.com/duvu/xcaro/server/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,7 +26,7 @@ func NewService(db *mongo.Database) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) Register(ctx context.Context, req *models.RegisterRequest) (*models.User, error) {
+func (s *Service) Register(ctx context.Context, req *models.RegisterRequest) (*models.AuthResponse, error) {
 	// Kiểm tra username đã tồn tại
 	var existingUser models.User
 	err := s.db.Collection("users").FindOne(ctx, bson.M{"username": req.Username}).Decode(&existingUser)
@@ -49,12 +54,25 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest) (*m
 
 	// Tạo user mới
 	now := time.Now()
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, err
+	}
+	plainToken := hex.EncodeToString(tokenBytes)
+	hash := sha256.Sum256([]byte(plainToken))
+	hashedToken := hex.EncodeToString(hash[:])
+
 	user := &models.User{
-		Username:  req.Username,
-		Email:     req.Email,
-		Password:  string(hashedPassword),
-		CreatedAt: now,
-		UpdatedAt: now,
+		Username:             req.Username,
+		Email:                req.Email,
+		Password:             string(hashedPassword),
+		EmailVerified:        false,
+		EmailVerifyToken:     hashedToken,
+		EmailVerifyExpiresAt: now.Add(24 * time.Hour),
+		EloRating:            1200,
+		CreatedAt:            now,
+		UpdatedAt:            now,
 	}
 
 	// Lưu vào database
@@ -62,12 +80,42 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest) (*m
 	if err != nil {
 		return nil, err
 	}
-
 	user.ID = result.InsertedID.(primitive.ObjectID)
-	return user, nil
+
+	go func() {
+		if err := email.SendVerificationEmail(user.Email, plainToken); err != nil {
+			log.Printf("[auth] SendVerificationEmail failed for %s: %v", user.Email, err)
+		}
+	}()
+
+	accessToken, err := GenerateToken(user.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	refreshToken, err := GenerateRefreshToken(user.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
+		"$set": bson.M{
+			"refresh_token":            refreshToken,
+			"refresh_token_expires_at": refreshExpiry,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.AuthResponse{
+		User:         user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
-func (s *Service) Login(ctx context.Context, req *models.LoginRequest) (*models.User, error) {
+func (s *Service) Login(ctx context.Context, req *models.LoginRequest) (*models.AuthResponse, error) {
 	var user models.User
 	err := s.db.Collection("users").FindOne(ctx, bson.M{"username": req.Username}).Decode(&user)
 	if err != nil {
@@ -83,7 +131,89 @@ func (s *Service) Login(ctx context.Context, req *models.LoginRequest) (*models.
 		return nil, errors.New("tên người dùng hoặc mật khẩu không đúng")
 	}
 
-	return &user, nil
+	accessToken, err := GenerateToken(user.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	refreshToken, err := GenerateRefreshToken(user.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
+		"$set": bson.M{
+			"refresh_token":            refreshToken,
+			"refresh_token_expires_at": refreshExpiry,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.AuthResponse{
+		User:         &user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func (s *Service) Refresh(ctx context.Context, req *models.RefreshTokenRequest) (*models.AuthResponse, error) {
+	userID, err := ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		return nil, errors.New("refresh token không hợp lệ")
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, errors.New("user ID không hợp lệ")
+	}
+
+	var user models.User
+	err = s.db.Collection("users").FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
+	if err != nil {
+		return nil, errors.New("không tìm thấy người dùng")
+	}
+
+	if user.RefreshToken != req.RefreshToken || time.Now().After(user.RefreshTokenExpiresAt) {
+		return nil, errors.New("refresh token không hợp lệ hoặc đã hết hạn")
+	}
+
+	newAccessToken, err := GenerateToken(userID)
+	if err != nil {
+		return nil, err
+	}
+	newRefreshToken, err := GenerateRefreshToken(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpiry := time.Now().Add(7 * 24 * time.Hour)
+	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{
+		"$set": bson.M{
+			"refresh_token":            newRefreshToken,
+			"refresh_token_expires_at": refreshExpiry,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.AuthResponse{
+		User:         &user,
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+	}, nil
+}
+
+func (s *Service) Logout(ctx context.Context, userID primitive.ObjectID) error {
+	_, err := s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": userID}, bson.M{
+		"$unset": bson.M{
+			"refresh_token":            "",
+			"refresh_token_expires_at": "",
+		},
+	})
+	return err
 }
 
 func (s *Service) GetProfile(ctx context.Context, userID primitive.ObjectID) (*models.User, error) {
@@ -299,5 +429,70 @@ func (s *Service) UnbanUser(ctx context.Context, req *models.UnbanUserRequest) e
 	if result.MatchedCount == 0 {
 		return errors.New("không tìm thấy người dùng")
 	}
+	return nil
+}
+
+func (s *Service) VerifyEmail(ctx context.Context, token string) error {
+	hash := sha256.Sum256([]byte(token))
+	hashedToken := hex.EncodeToString(hash[:])
+
+	var user models.User
+	err := s.db.Collection("users").FindOne(ctx, bson.M{"email_verify_token": hashedToken}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return errors.New("invalid or expired token")
+		}
+		return err
+	}
+
+	if time.Now().After(user.EmailVerifyExpiresAt) {
+		return errors.New("token has expired")
+	}
+
+	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
+		"$set":   bson.M{"email_verified": true, "updated_at": time.Now()},
+		"$unset": bson.M{"email_verify_token": "", "email_verify_expires_at": ""},
+	})
+	return err
+}
+
+func (s *Service) ResendVerification(ctx context.Context, userID string) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return errors.New("invalid user ID")
+	}
+
+	var user models.User
+	if err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": objectID}).Decode(&user); err != nil {
+		return errors.New("user not found")
+	}
+	if user.EmailVerified {
+		return errors.New("email already verified")
+	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return err
+	}
+	plainToken := hex.EncodeToString(tokenBytes)
+	hsh := sha256.Sum256([]byte(plainToken))
+	hashedToken := hex.EncodeToString(hsh[:])
+
+	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{
+		"$set": bson.M{
+			"email_verify_token":      hashedToken,
+			"email_verify_expires_at": time.Now().Add(24 * time.Hour),
+			"updated_at":              time.Now(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		if err := email.SendVerificationEmail(user.Email, plainToken); err != nil {
+			log.Printf("[auth] ResendVerification email failed for %s: %v", user.Email, err)
+		}
+	}()
 	return nil
 }

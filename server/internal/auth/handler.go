@@ -36,23 +36,13 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.Register(c.Request.Context(), &req)
+	resp, err := h.service.Register(c.Request.Context(), &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Tạo token
-	token, err := GenerateToken(user.ID.Hex())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "không thể tạo token"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"user":  user,
-		"token": token,
-	})
+	c.JSON(http.StatusCreated, resp)
 }
 
 // Login godoc
@@ -72,34 +62,47 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.Login(c.Request.Context(), &req)
+	resp, err := h.service.Login(c.Request.Context(), &req)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Tạo token
-	token, err := GenerateToken(user.ID.Hex())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "không thể tạo token"})
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) Refresh(c *gin.Context) {
+	var req models.RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user":  user,
-		"token": token,
-	})
+	resp, err := h.service.Refresh(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
-// GetProfile godoc
-// @Summary Lấy thông tin profile
-// @Description Lấy thông tin chi tiết của người dùng hiện tại
-// @Tags profile
-// @Security ApiKeyAuth
-// @Produce json
-// @Success 200 {object} models.User
-// @Failure 401 {object} map[string]string "error"
-// @Router /profile [get]
+func (h *Handler) Logout(c *gin.Context) {
+	userIDStr := c.GetString("user_id")
+	objectID, err := primitive.ObjectIDFromHex(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID không hợp lệ"})
+		return
+	}
+
+	if err := h.service.Logout(c.Request.Context(), objectID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "đăng xuất thành công"})
+}
+
 func (h *Handler) GetProfile(c *gin.Context) {
 	// Lấy user ID từ context (đã được set bởi middleware auth)
 	userID, exists := c.Get("userID")
@@ -374,4 +377,22 @@ func (h *Handler) UnbanUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "bỏ cấm người dùng thành công"})
+}
+
+func (h *Handler) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if err := h.service.VerifyEmail(c.Request.Context(), token); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Email verified successfully"})
+}
+
+func (h *Handler) ResendVerification(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if err := h.service.ResendVerification(c.Request.Context(), userID); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Verification email sent"})
 }

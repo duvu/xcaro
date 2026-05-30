@@ -8,7 +8,10 @@ import (
 
 	_ "github.com/duvu/xcaro/server/docs" // Import docs để swagger có thể đọc annotations
 	"github.com/duvu/xcaro/server/internal/auth"
+	"github.com/duvu/xcaro/server/internal/cache"
 	"github.com/duvu/xcaro/server/internal/game"
+	"github.com/duvu/xcaro/server/internal/leaderboard"
+	"github.com/duvu/xcaro/server/internal/middleware"
 	"github.com/duvu/xcaro/server/internal/models"
 	"github.com/duvu/xcaro/server/internal/ws"
 	"github.com/gin-gonic/gin"
@@ -89,12 +92,14 @@ func main() {
 	}
 	db := client.Database(dbName)
 
+	cache.InitRedis()
+
 	// Khởi tạo các services và handlers
 	authService := auth.NewService(db)
 	authHandler := auth.NewHandler(authService)
 
 	// Khởi tạo WebSocket hub
-	hub := ws.NewHub()
+	hub := ws.NewHubWithDB(db)
 	go hub.Run()
 
 	gameService := game.NewService(db, hub)
@@ -136,8 +141,11 @@ func main() {
 		// Auth routes
 		authGroup := api.Group("/auth")
 		{
-			authGroup.POST("/register", authHandler.Register)
-			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/register", middleware.RateLimiter(5, time.Minute, middleware.IPKey), authHandler.Register)
+			authGroup.POST("/login", middleware.RateLimiter(5, time.Minute, middleware.IPKey), authHandler.Login)
+			authGroup.POST("/refresh", authHandler.Refresh)
+			authGroup.POST("/logout", auth.AuthMiddleware(), authHandler.Logout)
+			authGroup.GET("/verify-email", authHandler.VerifyEmail)
 		}
 
 		// Protected routes
@@ -169,11 +177,14 @@ func main() {
 			// Game routes
 			games := protected.Group("/games")
 			games.Use(auth.RequirePermission(models.PermCreateGame))
+			games.Use(middleware.RateLimiter(60, time.Minute, middleware.UserKey))
 			{
 				games.POST("", gameHandler.CreateGame)
 				games.GET("", gameHandler.ListGames)
 				games.GET("/history", gameHandler.GetGameHistory)
 				games.GET("/stats", gameHandler.GetGameStats)
+				games.GET("/records", gameHandler.GetGameRecords)
+				games.GET("/records/stats", gameHandler.GetGameRecordStats)
 				games.GET("/:id", gameHandler.GetGame)
 				games.POST("/:id/join", gameHandler.JoinGame)
 				games.POST("/:id/move", gameHandler.MakeMove)
@@ -181,13 +192,24 @@ func main() {
 			}
 
 			// WebSocket routes
-			ws := protected.Group("/ws")
+			wsGroup := protected.Group("/ws")
 			{
-				ws.GET("", wsHandler.Connect)
-				ws.POST("/rooms/join", wsHandler.JoinRoom)
-				ws.POST("/rooms/leave", wsHandler.LeaveRoom)
-				ws.POST("/messages", wsHandler.SendMessage)
+				wsGroup.GET("", middleware.RateLimiter(10, time.Minute, middleware.IPKey), wsHandler.Connect)
+				wsGroup.POST("/rooms/join", wsHandler.JoinRoom)
+				wsGroup.POST("/rooms/leave", wsHandler.LeaveRoom)
+				wsGroup.POST("/messages", wsHandler.SendMessage)
 			}
+
+			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
+		}
+
+		lbHandler := leaderboard.NewHandler(db)
+		api.GET("/leaderboard", lbHandler.GetLeaderboard)
+		protectedOuter := api.Group("/")
+		protectedOuter.Use(auth.AuthMiddleware())
+		{
+			protectedOuter.GET("/users/:id/profile", lbHandler.GetUserProfile)
+			protectedOuter.PUT("/users/avatar", lbHandler.UpdateAvatar)
 		}
 	}
 

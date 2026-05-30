@@ -60,6 +60,8 @@ type GameStats struct {
 	Draws      int       `json:"draws" bson:"draws"`
 	TotalGames int       `json:"total_games" bson:"total_games"`
 	WinRate    float64   `json:"win_rate" bson:"win_rate"`
+	EloRating  int       `json:"elo_rating" bson:"elo_rating"`
+	Rank       int64     `json:"rank" bson:"rank"`
 	CreatedAt  time.Time `json:"created_at" bson:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at"`
 }

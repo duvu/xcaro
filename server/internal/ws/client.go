@@ -9,38 +9,26 @@ import (
 )
 
 const (
-	// Time allowed to write a message to the peer
-	writeWait = 10 * time.Second
-
-	// Time allowed to read the next pong message from the peer
-	pongWait = 60 * time.Second
-
-	// Send pings to peer with this period. Must be less than pongWait
-	pingPeriod = (pongWait * 9) / 10
-
-	// Maximum message size allowed from peer
-	maxMessageSize = 512
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
+	maxMessageSize = 512 * 1024
 )
 
-// Client is a middleman between the websocket connection and the hub
 type Client struct {
 	hub *Hub
 
-	// The websocket connection
 	conn *websocket.Conn
 
-	// Buffered channel of outbound messages
 	send chan *WSMessage
 
-	// User info
 	UserID   string
 	Username string
 
-	// Room info
 	CurrentRoom string
+	GameRoomID  string
 }
 
-// NewClient creates a new client
 func NewClient(hub *Hub, conn *websocket.Conn, userID, username string) *Client {
 	return &Client{
 		hub:      hub,
@@ -51,7 +39,11 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID, username string) *Client 
 	}
 }
 
-// ReadPump pumps messages from the websocket connection to the hub
+type incomingMessage struct {
+	Type    string                 `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
+}
+
 func (c *Client) ReadPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -74,44 +66,54 @@ func (c *Client) ReadPump() {
 			break
 		}
 
-		// Parse message
-		var wsMessage WSMessage
-		if err := json.Unmarshal(message, &wsMessage); err != nil {
+		var msg incomingMessage
+		if err := json.Unmarshal(message, &msg); err != nil {
 			log.Printf("error parsing message: %v", err)
 			continue
 		}
 
-		// Handle different message types
-		switch wsMessage.Type {
+		switch msg.Type {
+		case EventJoinRoom:
+			code := ""
+			if v, ok := msg.Payload["code"]; ok {
+				code, _ = v.(string)
+			}
+			c.hub.HandleJoinRoom(c, code)
+
+		case EventMakeMove:
+			x, y := 0, 0
+			if v, ok := msg.Payload["x"]; ok {
+				if f, ok := v.(float64); ok {
+					x = int(f)
+				}
+			}
+			if v, ok := msg.Payload["y"]; ok {
+				if f, ok := v.(float64); ok {
+					y = int(f)
+				}
+			}
+			c.hub.HandleMakeMove(c, x, y)
+
+		case EventResign:
+			c.hub.HandleResign(c)
+
 		case EventGameMove:
-			// Handle game move
 			if c.CurrentRoom != "" {
-				c.hub.broadcast <- &wsMessage
+				var wsMessage WSMessage
+				if err := json.Unmarshal(message, &wsMessage); err == nil {
+					c.hub.broadcast <- &wsMessage
+				}
 			}
 
 		case EventChatMessage:
-			// Handle chat message
-			if c.CurrentRoom != "" {
-				// Add user info to payload
-				if payload, ok := wsMessage.Payload.(map[string]interface{}); ok {
-					payload["user_id"] = c.UserID
-					payload["username"] = c.Username
-					payload["timestamp"] = time.Now().Unix()
-					wsMessage.Payload = payload
-				}
-				c.hub.broadcast <- &wsMessage
-			}
+			c.hub.HandleChatMessage(c, Message{Type: msg.Type, Payload: msg.Payload})
 
 		case EventPing:
-			// Handle ping
-			c.send <- &WSMessage{
-				Type: EventPong,
-			}
+			c.send <- &WSMessage{Type: EventPong}
 		}
 	}
 }
 
-// WritePump pumps messages from the hub to the websocket connection
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -124,12 +126,10 @@ func (c *Client) WritePump() {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			// Marshal message
 			data, err := json.Marshal(message)
 			if err != nil {
 				log.Printf("error marshaling message: %v", err)
@@ -142,7 +142,6 @@ func (c *Client) WritePump() {
 			}
 			w.Write(data)
 
-			// Add queued messages to the current websocket message
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				data, err := json.Marshal(<-c.send)
@@ -167,7 +166,6 @@ func (c *Client) WritePump() {
 	}
 }
 
-// JoinRoom makes the client join a room
 func (c *Client) JoinRoom(roomID string) {
 	if c.CurrentRoom != "" {
 		c.LeaveRoom()
@@ -176,7 +174,6 @@ func (c *Client) JoinRoom(roomID string) {
 	c.hub.JoinRoom(roomID, c)
 }
 
-// LeaveRoom makes the client leave their current room
 func (c *Client) LeaveRoom() {
 	if c.CurrentRoom != "" {
 		c.hub.LeaveRoom(c.CurrentRoom, c)
