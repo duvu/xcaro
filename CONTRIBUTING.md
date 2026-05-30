@@ -86,6 +86,33 @@ Use Conventional Commits:
 - [ ] No secrets, tokens, `.env` files, or generated credentials are committed
 - [ ] New API or WebSocket behavior is documented when applicable
 
+## Phase 1 Release Validation
+
+Before merging a release candidate, update `docs/RELEASE_EVIDENCE.md` and run:
+
+```bash
+cd server
+go build ./...
+go vet ./...
+go test ./...
+```
+
+```bash
+cd client
+flutter pub get
+flutter analyze
+flutter test
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 flutter build apk --release
+```
+
+For local API smoke testing, start infrastructure first:
+
+```bash
+docker compose -f server/docker-compose.yml up -d mongodb redis
+```
+
+Then run the server with local-only environment values from `server/.env.example` and probe `/api/health`, `/api/leaderboard`, and a protected endpoint without a bearer token.
+
 ## Go Style
 
 - Run `gofmt` on changed Go files.

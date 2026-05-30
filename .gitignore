@@ -49,3 +49,4 @@ app.*.map.json
 
 # Flutter build artifacts inside the client project
 client/build/
+client/android/app/.cxx/

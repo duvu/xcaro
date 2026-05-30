@@ -60,6 +60,31 @@ Configure these secrets in **Settings → Secrets and variables → Actions**:
 
 The deploy workflow SSHs into the server and runs `docker-compose pull && docker-compose up -d` in `~/xcaro/`.
 
+## Release Readiness
+
+Phase 1 stabilization evidence lives in:
+
+- [`docs/release-readiness.md`](docs/release-readiness.md) — release gate checklist
+- [`docs/RELEASE_EVIDENCE.md`](docs/RELEASE_EVIDENCE.md) — command output summary and go/no-go decision
+- [`docs/qa-matrix.md`](docs/qa-matrix.md) — manual QA matrix and environment blockers
+
+Canonical validation commands:
+
+```bash
+cd server
+go build ./...
+go vet ./...
+go test ./...
+```
+
+```bash
+cd client
+flutter pub get
+flutter analyze
+flutter test
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 flutter build apk --release
+```
+
 ## License
 
 MIT License - xem file [LICENSE](LICENSE) để biết thêm chi tiết.
