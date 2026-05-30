@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/duvu/xcaro/server/internal/email"
@@ -84,7 +84,7 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest) (*m
 
 	go func() {
 		if err := email.SendVerificationEmail(user.Email, plainToken); err != nil {
-			log.Printf("[auth] SendVerificationEmail failed for %s: %v", user.Email, err)
+			slog.Error("send verification email failed", "event", "register", "email", user.Email, "error", err)
 		}
 	}()
 
@@ -491,7 +491,7 @@ func (s *Service) ResendVerification(ctx context.Context, userID string) error {
 
 	go func() {
 		if err := email.SendVerificationEmail(user.Email, plainToken); err != nil {
-			log.Printf("[auth] ResendVerification email failed for %s: %v", user.Email, err)
+			slog.Error("send verification email failed", "event", "resend", "email", user.Email, "error", err)
 		}
 	}()
 	return nil

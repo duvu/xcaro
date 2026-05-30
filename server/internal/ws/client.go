@@ -2,7 +2,7 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -61,14 +61,14 @@ func (c *Client) ReadPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				slog.Error("websocket read error", "error", err, "user_id", c.UserID)
 			}
 			break
 		}
 
 		var msg incomingMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Printf("error parsing message: %v", err)
+			slog.Warn("invalid message", "error", err, "user_id", c.UserID)
 			continue
 		}
 
@@ -108,6 +108,12 @@ func (c *Client) ReadPump() {
 		case EventChatMessage:
 			c.hub.HandleChatMessage(c, Message{Type: msg.Type, Payload: msg.Payload})
 
+		case EventQuickMatchRequest:
+			c.hub.EnqueueQuickMatch(c)
+
+		case "quick_match_cancel":
+			c.hub.DequeueQuickMatch(c)
+
 		case EventPing:
 			c.send <- &WSMessage{Type: EventPong}
 		}
@@ -132,7 +138,7 @@ func (c *Client) WritePump() {
 
 			data, err := json.Marshal(message)
 			if err != nil {
-				log.Printf("error marshaling message: %v", err)
+				slog.Warn("marshal error", "error", err)
 				continue
 			}
 
@@ -146,7 +152,7 @@ func (c *Client) WritePump() {
 			for i := 0; i < n; i++ {
 				data, err := json.Marshal(<-c.send)
 				if err != nil {
-					log.Printf("error marshaling queued message: %v", err)
+					slog.Warn("marshal error", "error", err)
 					continue
 				}
 				w.Write([]byte("\n"))

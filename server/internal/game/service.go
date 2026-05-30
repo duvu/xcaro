@@ -291,7 +291,7 @@ func (s *Service) ListGames(ctx context.Context, req *models.ListGamesRequest) (
 	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
 		SetSkip(int64(skip)).
 		SetLimit(int64(req.Limit)).
-		SetSort(bson.D{{"created_at", -1}}))
+		SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func (s *Service) GetGameHistory(ctx context.Context, req *models.GetGameHistory
 	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
 		SetSkip(int64(skip)).
 		SetLimit(int64(req.Limit)).
-		SetSort(bson.D{{"created_at", -1}}))
+		SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +592,7 @@ func (s *Service) SearchGames(ctx context.Context, req *models.SearchGamesReques
 	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
 		SetSkip(int64(skip)).
 		SetLimit(int64(req.Limit)).
-		SetSort(bson.D{{"created_at", -1}}))
+		SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +628,7 @@ func (s *Service) ExportGameHistory(ctx context.Context, req *models.ExportHisto
 
 	// Lấy tất cả game trong khoảng thời gian
 	cursor, err := s.db.Collection("games").Find(ctx, query, options.Find().
-		SetSort(bson.D{{"created_at", -1}}))
+		SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}

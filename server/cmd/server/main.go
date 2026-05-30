@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
-	_ "github.com/duvu/xcaro/server/docs" // Import docs để swagger có thể đọc annotations
+	_ "github.com/duvu/xcaro/server/docs"
+	"github.com/duvu/xcaro/server/internal/apierrors"
 	"github.com/duvu/xcaro/server/internal/auth"
 	"github.com/duvu/xcaro/server/internal/cache"
 	"github.com/duvu/xcaro/server/internal/game"
 	"github.com/duvu/xcaro/server/internal/leaderboard"
+	"github.com/duvu/xcaro/server/internal/metrics"
 	"github.com/duvu/xcaro/server/internal/middleware"
 	"github.com/duvu/xcaro/server/internal/models"
+	"github.com/duvu/xcaro/server/internal/reports"
 	"github.com/duvu/xcaro/server/internal/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -65,7 +69,12 @@ func init() {
 }
 
 func main() {
-	// Kết nối MongoDB
+	if os.Getenv("GIN_MODE") == "release" {
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -110,7 +119,11 @@ func main() {
 	// Khởi tạo router
 	r := gin.Default()
 
-	// Cấu hình CORS
+	r.Use(func(c *gin.Context) {
+		metrics.Get().IncRequests()
+		c.Next()
+	})
+
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -201,15 +214,26 @@ func main() {
 			}
 
 			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
+
+			reports.RegisterRoutes(protected, db)
 		}
 
 		lbHandler := leaderboard.NewHandler(db)
 		api.GET("/leaderboard", lbHandler.GetLeaderboard)
+		apierrors.RegisterRoutes(api, db)
 		protectedOuter := api.Group("/")
 		protectedOuter.Use(auth.AuthMiddleware())
 		{
 			protectedOuter.GET("/users/:id/profile", lbHandler.GetUserProfile)
 			protectedOuter.PUT("/users/avatar", lbHandler.UpdateAvatar)
+		}
+		adminOuter := api.Group("/admin")
+		adminOuter.Use(auth.AuthMiddleware())
+		adminOuter.Use(auth.RequireRole(models.RoleAdmin))
+		{
+			adminOuter.GET("/metrics", func(c *gin.Context) {
+				c.JSON(200, metrics.Get().Snapshot())
+			})
 		}
 	}
 

@@ -53,3 +53,7 @@ func UserKey(c *gin.Context) string {
 	}
 	return userID
 }
+
+func UserRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
+	return RateLimiter(limit, window, UserKey)
+}

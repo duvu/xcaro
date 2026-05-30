@@ -2,11 +2,12 @@ package ws
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/duvu/xcaro/server/internal/metrics"
 	"github.com/duvu/xcaro/server/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,6 +19,7 @@ type Hub struct {
 	rooms      map[string]map[*Client]bool
 	gameRooms  map[string]*Room
 	codes      map[string]*Room
+	matchQueue []*Client
 	broadcast  chan *WSMessage
 	register   chan *Client
 	unregister chan *Client
@@ -52,6 +54,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
+			metrics.Get().IncConnections()
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -60,6 +63,7 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
+			metrics.Get().DecConnections()
 			h.handleClientDisconnect(client)
 
 		case message := <-h.broadcast:
@@ -87,18 +91,18 @@ func (h *Hub) Broadcast(message *WSMessage) {
 	select {
 	case h.broadcast <- message:
 	default:
-		log.Printf("broadcast channel is full")
+		slog.Warn("broadcast channel full")
 	}
 }
 
 func (h *Hub) JoinRoom(roomID string, client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	if h.rooms[roomID] == nil {
 		h.rooms[roomID] = make(map[*Client]bool)
 	}
 	h.rooms[roomID][client] = true
+	h.mu.Unlock()
 
 	h.BroadcastToRoom(roomID, &WSMessage{
 		Type:   EventPlayerJoin,
@@ -111,10 +115,15 @@ func (h *Hub) JoinRoom(roomID string, client *Client) {
 
 func (h *Hub) LeaveRoom(roomID string, client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
+	leftRoom := false
 	if room, ok := h.rooms[roomID]; ok {
 		delete(room, client)
+		leftRoom = true
+	}
+	h.mu.Unlock()
+
+	if leftRoom {
 		h.BroadcastToRoom(roomID, &WSMessage{
 			Type:   EventPlayerLeave,
 			RoomID: roomID,
@@ -123,6 +132,13 @@ func (h *Hub) LeaveRoom(roomID string, client *Client) {
 			},
 		})
 	}
+}
+
+func (h *Hub) GetClientCount(roomID string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	return len(h.rooms[roomID])
 }
 
 func (h *Hub) BroadcastToRoom(roomID string, message *WSMessage) {
@@ -167,6 +183,7 @@ func (h *Hub) HandleCreateRoom(client *Client) {
 	h.gameRooms[room.ID] = room
 	h.codes[code] = room
 	h.mu.Unlock()
+	metrics.Get().IncGames()
 
 	client.GameRoomID = room.ID
 	client.Send(&WSMessage{
@@ -277,6 +294,7 @@ func (h *Hub) HandleMakeMove(client *Client, x, y int) {
 		client.Send(&WSMessage{Type: EventError, Payload: map[string]string{"message": err.Error()}})
 		return
 	}
+	metrics.Get().IncMoves()
 
 	state := room.ToGameState()
 	if room.GameOver {
@@ -428,6 +446,94 @@ func (h *Hub) isEmailVerified(client *Client) bool {
 		return true
 	}
 	return user.EmailVerified
+}
+
+func (h *Hub) EnqueueQuickMatch(client *Client) {
+	h.mu.Lock()
+
+	if len(h.matchQueue) > 0 {
+		opponent := h.matchQueue[0]
+		h.matchQueue = h.matchQueue[1:]
+
+		code := generateRoomCode()
+		for {
+			if _, exists := h.codes[code]; !exists {
+				break
+			}
+			code = generateRoomCode()
+		}
+
+		room := NewRoom(code, code, h.db)
+		room.PlayerX = opponent
+		room.PlayerO = client
+		room.Started = true
+		room.StartedAt = time.Now()
+		h.gameRooms[room.ID] = room
+		h.codes[code] = room
+		opponent.GameRoomID = room.ID
+		client.GameRoomID = room.ID
+
+		queueSize := int64(len(h.matchQueue))
+		h.mu.Unlock()
+
+		metrics.Get().IncGames()
+		metrics.Get().SetQueueSize(queueSize)
+
+		state := room.ToGameState()
+		opponent.Send(&WSMessage{Type: EventQuickMatchFound, Payload: map[string]interface{}{
+			"room_id":   room.ID,
+			"room_code": room.Code,
+			"color":     "X",
+		}})
+		client.Send(&WSMessage{Type: EventQuickMatchFound, Payload: map[string]interface{}{
+			"room_id":   room.ID,
+			"room_code": room.Code,
+			"color":     "O",
+		}})
+		h.broadcastToGameRoom(room, &WSMessage{Type: EventGameState, RoomID: room.ID, Payload: state})
+		slog.Info("quick_match_found", "room_id", room.ID, "player_x", opponent.UserID, "player_o", client.UserID)
+		return
+	}
+
+	h.matchQueue = append(h.matchQueue, client)
+	queueSize := int64(len(h.matchQueue))
+	h.mu.Unlock()
+
+	metrics.Get().SetQueueSize(queueSize)
+	slog.Info("quick_match_queued", "user_id", client.UserID, "queue_size", queueSize)
+
+	go func() {
+		time.Sleep(60 * time.Second)
+		h.mu.Lock()
+		found := false
+		for i, c := range h.matchQueue {
+			if c == client {
+				h.matchQueue = append(h.matchQueue[:i], h.matchQueue[i+1:]...)
+				found = true
+				break
+			}
+		}
+		qSize := int64(len(h.matchQueue))
+		h.mu.Unlock()
+		if found {
+			metrics.Get().SetQueueSize(qSize)
+			client.Send(&WSMessage{Type: EventQuickMatchTimeout, Payload: map[string]interface{}{}})
+		}
+	}()
+}
+
+func (h *Hub) DequeueQuickMatch(client *Client) {
+	h.mu.Lock()
+	for i, c := range h.matchQueue {
+		if c == client {
+			h.matchQueue = append(h.matchQueue[:i], h.matchQueue[i+1:]...)
+			break
+		}
+	}
+	queueSize := int64(len(h.matchQueue))
+	h.mu.Unlock()
+	metrics.Get().SetQueueSize(queueSize)
+	client.Send(&WSMessage{Type: EventQuickMatchCancelled, Payload: map[string]interface{}{}})
 }
 
 func (h *Hub) HandleChatMessage(client *Client, msg Message) {

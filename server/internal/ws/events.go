@@ -21,6 +21,11 @@ const (
 	EventStreamStop   = "stream_stop"
 	EventStreamStatus = "stream_status"
 
+	EventQuickMatchRequest   = "quick_match_request"
+	EventQuickMatchFound     = "quick_match_found"
+	EventQuickMatchCancelled = "quick_match_cancelled"
+	EventQuickMatchTimeout   = "quick_match_timeout"
+
 	EventError = "error"
 	EventPing  = "ping"
 	EventPong  = "pong"

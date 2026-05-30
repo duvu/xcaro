@@ -38,6 +38,8 @@ func TestHub(t *testing.T) {
 	client1.JoinRoom(roomID)
 	client2.JoinRoom(roomID)
 	time.Sleep(100 * time.Millisecond)
+	drainMessages(client1.send)
+	drainMessages(client2.send)
 
 	if hub.GetClientCount(roomID) != 2 {
 		t.Errorf("Expected 2 clients in room, got %d", hub.GetClientCount(roomID))
@@ -76,5 +78,15 @@ func TestHub(t *testing.T) {
 
 	if len(hub.clients) != 0 {
 		t.Errorf("Expected 0 clients, got %d", len(hub.clients))
+	}
+}
+
+func drainMessages(ch <-chan *WSMessage) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
 	}
 }
