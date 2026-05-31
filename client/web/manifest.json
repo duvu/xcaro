@@ -1,6 +1,6 @@
 {
-    "name": "xcaro",
-    "short_name": "xcaro",
+    "name": "PlayVerse",
+    "short_name": "PlayVerse",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1A2035",

@@ -1,4 +1,4 @@
-# XCaro Sound Effect Requirements
+# PlayVerse Sound Effect Requirements
 
 This directory is reserved for short, lightweight game sounds. Prefer sourcing
 or exporting each sound as both MP3 and OGG for broad platform/web support.

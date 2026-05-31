@@ -1,4 +1,4 @@
-package com.example.xcaro
+package com.example.playverse
 
 import io.flutter.embedding.android.FlutterActivity
 

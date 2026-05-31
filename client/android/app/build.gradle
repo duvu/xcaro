@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "vn.x51.game2d.xcaro"
+    namespace "vn.x51.game2d.playverse"
     compileSdkVersion flutter.compileSdkVersion
     ndkVersion "27.0.12077973"
 
@@ -41,7 +41,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "vn.x51.game2d.xcaro"
+        applicationId "vn.x51.game2d.playverse"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion flutter.minSdkVersion
@@ -52,16 +52,16 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("xcaro-key.jks")
+            storeFile file("playverse-key.jks")
             storePassword "your-store-password"
-            keyAlias "xcaro"
+            keyAlias "playverse"
             keyPassword "your-key-password"
         }
     }
 
     buildTypes {
         release {
-            signingConfig file("xcaro-key.jks").exists() ? signingConfigs.release : signingConfigs.debug
+            signingConfig file("playverse-key.jks").exists() ? signingConfigs.release : signingConfigs.debug
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
