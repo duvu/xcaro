@@ -1,6 +1,6 @@
 ## Why
 
-XCaro has a complete MVP1+MVP2 feature set but lacks the surrounding project scaffolding that makes it presentable to users, contributors, and app stores. Without an icon, splash screen, documentation, and contribution guidelines the project cannot be published or onboarded to by new developers.
+PlayVerse has a complete MVP1+MVP2 feature set but lacks the surrounding project scaffolding that makes it presentable to users, contributors, and app stores. Without an icon, splash screen, documentation, and contribution guidelines the project cannot be published or onboarded to by new developers.
 
 ## What Changes
 

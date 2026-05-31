@@ -5,7 +5,7 @@ The system SHALL provide a branded app icon for all required platform sizes and 
 
 #### Scenario: Android adaptive icon displayed
 - **WHEN** the app is installed on an Android device
-- **THEN** the app icon displays the XCaro stone motif on a navy (`#1A2035`) background as an adaptive icon, rendering correctly on all launcher shapes (circle, square, squircle)
+- **THEN** the app icon displays the PlayVerse stone motif on a navy (`#1A2035`) background as an adaptive icon, rendering correctly on all launcher shapes (circle, square, squircle)
 
 #### Scenario: iOS icon displayed
 - **WHEN** the app is installed on an iOS device
@@ -22,7 +22,7 @@ The system SHALL display a branded splash screen on app launch rather than the d
 
 #### Scenario: Splash screen shown on cold start
 - **WHEN** the app is launched from a cold start on Android or iOS
-- **THEN** a full-screen splash is shown with navy background and centered XCaro logo/wordmark; the splash is dismissed once the Flutter engine is ready
+- **THEN** a full-screen splash is shown with navy background and centered PlayVerse logo/wordmark; the splash is dismissed once the Flutter engine is ready
 
 #### Scenario: Splash generation from config
 - **WHEN** `dart run flutter_native_splash:create` is run in the `client/` directory

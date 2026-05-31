@@ -2,7 +2,7 @@
 
 ## Why
 
-Phase 1 stabilization validated that the XCaro MVP builds, tests, and deploys cleanly. Phase 2 makes the product usable by real beta users: it removes the friction of manual room codes, gives players richer online context through polished UX states, adds the infrastructure to debug and monitor a live service, and introduces lightweight moderation so beta sessions remain civil.
+Phase 1 stabilization validated that the PlayVerse MVP builds, tests, and deploys cleanly. Phase 2 makes the product usable by real beta users: it removes the friction of manual room codes, gives players richer online context through polished UX states, adds the infrastructure to debug and monitor a live service, and introduces lightweight moderation so beta sessions remain civil.
 
 ## What Changes
 

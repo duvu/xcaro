@@ -50,7 +50,7 @@
 ## 8. Client — Room Invite Share
 
 - [x] 8.1 `client/pubspec.yaml`: Add `share_plus: ^10.0.0` dependency
-- [x] 8.2 `client/lib/screens/create_room_screen.dart`: Import share_plus; after room is created and code is visible, add Share button that calls Share.share("Join my XCaro game! Code: \$code\nxcaro://room/\$code")
+- [x] 8.2 `client/lib/screens/create_room_screen.dart`: Import share_plus; after room is created and code is visible, add Share button that calls Share.share("Join my PlayVerse game! Code: \$code\nplayverse://room/\$code")
 - [x] 8.3 `client/lib/screens/create_room_screen.dart`: Show "Waiting for opponent..." below code with LinearProgressIndicator; Share button visible throughout waiting state
 
 ## 9. Client — UX Polish

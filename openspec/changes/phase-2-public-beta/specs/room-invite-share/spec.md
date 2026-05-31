@@ -11,8 +11,8 @@ Allow a room host to share their room code to other apps or clipboard so friends
 - `CreateRoomScreen` MUST show an `IconButton(icon: Icons.share)` after a room has been created and the room code is displayed.
 - Pressing the share button MUST invoke `Share.share(text)` from the `share_plus` package with the payload:
   ```
-  Tham gia phòng XCaro của mình! Mã phòng: <CODE>
-  xcaro://room/<CODE>
+  Tham gia phòng PlayVerse của mình! Mã phòng: <CODE>
+  playverse://room/<CODE>
   ```
 - The share button MUST be disabled/hidden before a room code is received from the server.
 - `share_plus` MUST be added to `client/pubspec.yaml` as a runtime dependency.
@@ -27,7 +27,7 @@ Allow a room host to share their room code to other apps or clipboard so friends
 
 ### Future (Not in Phase 2)
 
-- Deep-link routing (`xcaro://room/<code>` launches the app to `JoinRoomScreen` pre-filled) is deferred to a future change.
+- Deep-link routing (`playverse://room/<code>` launches the app to `JoinRoomScreen` pre-filled) is deferred to a future change.
 
 ## Acceptance Criteria
 

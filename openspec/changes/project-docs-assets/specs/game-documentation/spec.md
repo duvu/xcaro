@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Gomoku Game Rules Document
-The project SHALL include a user-facing markdown document explaining Gomoku rules and XCaro game features.
+The project SHALL include a user-facing markdown document explaining Gomoku rules and PlayVerse game features.
 
 #### Scenario: Rules file present at root
 - **WHEN** a user visits the repository or accesses the in-app help
-- **THEN** `GAME_RULES.md` exists at the repo root and covers: objective, board layout, how to place a stone, win condition (5 in a row), draw condition, and UI controls for XCaro
+- **THEN** `GAME_RULES.md` exists at the repo root and covers: objective, board layout, how to place a stone, win condition (5 in a row), draw condition, and UI controls for PlayVerse
 
 ---
 

@@ -1,6 +1,6 @@
 ## Why
 
-XCaro is a Gomoku (Caro) game built with Flutter and Go. The current codebase has the skeleton in place — Flutter client, Go server, WebSocket infrastructure — but key features needed for a releasable MVP are incomplete or missing: user authentication is unfinished, the online multiplayer game loop is not fully wired end-to-end, and the AI opponent lacks playable difficulty levels. MVP1 closes these gaps so we have a shippable product players can actually use.
+PlayVerse is a Gomoku (Caro) game built with Flutter and Go. The current codebase has the skeleton in place — Flutter client, Go server, WebSocket infrastructure — but key features needed for a releasable MVP are incomplete or missing: user authentication is unfinished, the online multiplayer game loop is not fully wired end-to-end, and the AI opponent lacks playable difficulty levels. MVP1 closes these gaps so we have a shippable product players can actually use.
 
 ## What Changes
 

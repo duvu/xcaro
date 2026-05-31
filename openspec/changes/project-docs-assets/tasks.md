@@ -65,9 +65,9 @@
   - **Board**: 15×15 grid, intersections
   - **Objective**: First to get 5 stones in a row (horizontal, vertical, or diagonal)
   - **Turns**: Players alternate; Black (X) goes first
-  - **Win Condition**: Exactly 5 or more in a row counts (no overline rule in XCaro)
+  - **Win Condition**: Exactly 5 or more in a row counts (no overline rule in PlayVerse)
   - **Draw Condition**: Board is full with no winner
-  - **XCaro Controls**: How to create a room, join a room, play vs AI, use chat, view leaderboard
+  - **PlayVerse Controls**: How to create a room, join a room, play vs AI, use chat, view leaderboard
   - **Tips for beginners**: 3-5 strategic tips
 
 ## 5. Developer Documentation
@@ -102,8 +102,8 @@
   - **Adding WS Event Types**: Where to add constants (`internal/ws/events.go`), how to route in client.go
 - [x] 6.2 Create `server/.env.example` file documenting all required env vars:
   ```
-  MONGODB_URI=mongodb://admin:secret@localhost:27017/xcaro?authSource=admin
-  DB_NAME=xcaro
+  MONGODB_URI=mongodb://admin:secret@localhost:27017/playverse?authSource=admin
+  DB_NAME=playverse
   PORT=8080
   JWT_SECRET=change-me-in-production
   REDIS_URL=redis://localhost:6379
@@ -111,7 +111,7 @@
   SMTP_PORT=587
   SMTP_USER=
   SMTP_PASS=
-  SMTP_FROM=noreply@xcaro.com
+  SMTP_FROM=noreply@playverse.com
   APP_URL=http://localhost:8080
   ```
 
@@ -119,18 +119,18 @@
 
 - [x] 7.1 Create `store/` directory at repo root
 - [x] 7.2 Create `store/play-store.md` with:
-  - **Title** (≤30 chars): `XCaro - Gomoku Online`
+  - **Title** (≤30 chars): `PlayVerse - Gomoku Online`
   - **Short Description** (≤80 chars): `Play Gomoku online or vs AI. Ranked matches, chat, leaderboard. Free!`
   - **Full Description** (≤4000 chars): 4–6 paragraphs covering gameplay, online multiplayer, AI difficulty, Elo ranking, chat feature, and technical quality
   - **Content Rating**: Everyone (no violence, no adult content)
   - **Keywords**: gomoku, caro, five in a row, board game, strategy, online multiplayer, ai
   - **What's New (v1.0.0)**: Initial release changelog
 - [x] 7.3 Create `store/app-store.md` with:
-  - **Name** (≤30 chars): `XCaro – Gomoku Online`
+  - **Name** (≤30 chars): `PlayVerse – Gomoku Online`
   - **Subtitle** (≤30 chars): `Strategy Board Game`
   - **Promotional Text** (≤170 chars): Seasonal/timely blurb
   - **Description** (≤4000 chars): Same tone as Play Store but formatted for App Store
   - **Keywords** (≤100 chars total): comma-separated
-  - **Support URL**: `https://github.com/<owner>/xcaro/issues`
+  - **Support URL**: `https://github.com/<owner>/playverse/issues`
   - **Privacy Policy URL**: placeholder
 - [x] 7.4 Create `store/screenshots.md` documenting 5 required screenshot scenes with captions and device size requirements (6.7" Android, 6.5" iOS)

@@ -2,7 +2,7 @@
 
 ## Current State
 
-The XCaro MVP (Phase 1 validated) provides: JWT auth, WS-based online rooms identified by a 6-character code, in-game chat, AI opponent, Elo leaderboard, email verification, Redis caching, rate limiting, and CI/CD. The client has no matchmaking, no sharing, no empty-state widgets, no error tracking, and logging is stdlib `log.Printf`. There is no server metrics surface.
+The PlayVerse MVP (Phase 1 validated) provides: JWT auth, WS-based online rooms identified by a 6-character code, in-game chat, AI opponent, Elo leaderboard, email verification, Redis caching, rate limiting, and CI/CD. The client has no matchmaking, no sharing, no empty-state widgets, no error tracking, and logging is stdlib `log.Printf`. There is no server metrics surface.
 
 ## Goals
 
@@ -43,7 +43,7 @@ The XCaro MVP (Phase 1 validated) provides: JWT auth, WS-based online rooms iden
 
 **Decision**: Flutter `share_plus` package. The room code is shared as plain text with a deep-link prefix.
 
-- `CreateRoomScreen` gains a "Share" `IconButton` that calls `Share.shareXFiles([])` with a text payload: `Tham gia phòng XCaro của mình: xcaro://room/<code>` or a fallback plain-code text.
+- `CreateRoomScreen` gains a "Share" `IconButton` that calls `Share.shareXFiles([])` with a text payload: `Tham gia phòng PlayVerse của mình: playverse://room/<code>` or a fallback plain-code text.
 - Deep-link handling (routing user directly to JoinRoomScreen with pre-filled code) is a future task; Phase 2 only sends the share sheet.
 - No new server API needed.
 

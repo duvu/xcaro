@@ -73,7 +73,7 @@
 ## 10. CI/CD (DevOps)
 
 - [x] 10.1 Create `.github/workflows/pr.yml` — triggers on PR to `main`; jobs: `server-check` (`go vet`, `go test ./...`), `client-check` (`flutter analyze`, `flutter test`)
-- [x] 10.2 Create `.github/workflows/deploy.yml` — triggers on push to `main`; jobs: build Docker image, push to GHCR (`ghcr.io/<owner>/xcaro-server:latest` + SHA tag), SSH deploy with `docker-compose pull && docker-compose up -d`
+- [x] 10.2 Create `.github/workflows/deploy.yml` — triggers on push to `main`; jobs: build Docker image, push to GHCR (`ghcr.io/<owner>/playverse-server:latest` + SHA tag), SSH deploy with `docker-compose pull && docker-compose up -d`
 - [x] 10.3 Create `server/Dockerfile` (if not exists) with multi-stage build: `golang:1.21-alpine` builder → `alpine:latest` runtime
 - [x] 10.4 Document required GitHub Actions secrets in `README.md`: `GHCR_TOKEN`, `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`
 

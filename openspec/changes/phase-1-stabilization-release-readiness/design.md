@@ -1,6 +1,6 @@
 ## Context
 
-XCaro now has MVP1/MVP2-level functionality across the Flutter client and Go backend: JWT refresh-token auth, email verification, WebSocket rooms, move sync, chat, AI difficulties, history, Elo leaderboard, Redis caching/rate limiting, Docker Compose, GitHub Actions, app icons/splash, and documentation. The next roadmap phase is stabilization and release readiness, not new product behavior.
+PlayVerse now has MVP1/MVP2-level functionality across the Flutter client and Go backend: JWT refresh-token auth, email verification, WebSocket rooms, move sync, chat, AI difficulties, history, Elo leaderboard, Redis caching/rate limiting, Docker Compose, GitHub Actions, app icons/splash, and documentation. The next roadmap phase is stabilization and release readiness, not new product behavior.
 
 The current codebase already contains basic automated checks:
 
@@ -13,8 +13,8 @@ The current codebase already contains basic automated checks:
 Known stabilization concerns from discovery:
 
 - `flutter analyze` previously completed with zero errors but many warnings/infos; Phase 1 should target high-impact warnings instead of cosmetic churn.
-- Docker Compose currently includes placeholder/weak local secrets such as `JWT_SECRET=xcaro-jwt-secret-key-2024`; this is acceptable for local development only and must be called out in release checks.
-- The deploy workflow assumes `~/xcaro` on the target host and `docker-compose` availability.
+- Docker Compose currently includes placeholder/weak local secrets such as `JWT_SECRET=playverse-jwt-secret-key-2024`; this is acceptable for local development only and must be called out in release checks.
+- The deploy workflow assumes `~/playverse` on the target host and `docker-compose` availability.
 - Store-critical Android configuration still contains the default application ID TODO in `client/android/app/build.gradle`.
 - The MVP PR is large and includes generated assets, broad backend/client changes, and prior `feature/websocket` history; reviewers need a subsystem-based checklist.
 

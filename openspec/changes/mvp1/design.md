@@ -1,6 +1,6 @@
 ## Context
 
-XCaro has a Flutter client (Flame + Provider) and a Go backend (Gin + Gorilla WebSocket + MongoDB). The existing code has screens, routes, and service stubs in place, but the auth flow is incomplete (no refresh token, no persistent session), the online multiplayer game loop is partially wired, the AI opponent is absent, and game history is not persisted. This design covers how to close those gaps for MVP1.
+PlayVerse has a Flutter client (Flame + Provider) and a Go backend (Gin + Gorilla WebSocket + MongoDB). The existing code has screens, routes, and service stubs in place, but the auth flow is incomplete (no refresh token, no persistent session), the online multiplayer game loop is partially wired, the AI opponent is absent, and game history is not persisted. This design covers how to close those gaps for MVP1.
 
 Stack: Flutter/Dart (client), Go 1.21+ (server), MongoDB (storage), WebSocket (real-time), JWT (auth).
 

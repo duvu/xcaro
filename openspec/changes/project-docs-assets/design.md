@@ -1,11 +1,11 @@
 ## Context
 
-XCaro is a fully-featured Flutter Gomoku game with Go backend (MVP1+MVP2 complete): JWT auth, WebSocket multiplayer, AI opponent, Elo leaderboard, in-game chat. The codebase is production-ready but lacks the surrounding scaffolding expected of a published mobile app: there is no app icon (uses default Flutter icon), no splash screen, no documentation beyond a basic README, and no store listing materials. This change adds all the missing "first impression" and developer-experience assets.
+PlayVerse is a fully-featured Flutter Gomoku game with Go backend (MVP1+MVP2 complete): JWT auth, WebSocket multiplayer, AI opponent, Elo leaderboard, in-game chat. The codebase is production-ready but lacks the surrounding scaffolding expected of a published mobile app: there is no app icon (uses default Flutter icon), no splash screen, no documentation beyond a basic README, and no store listing materials. This change adds all the missing "first impression" and developer-experience assets.
 
 Key existing constraints:
 - Flutter SDK ~3.x, Dart; assets referenced in `client/pubspec.yaml`
 - Existing `client/assets/` directory structure
-- Brand identity: "XCaro" — Gomoku (五目並べ) with Vietnamese flavor
+- Brand identity: "PlayVerse" — Gomoku (五目並べ) with Vietnamese flavor
 - Color palette: to be established (recommend dark navy `#1A2035` background, gold `#FFD700` accent stones)
 
 ## Goals / Non-Goals
@@ -39,7 +39,7 @@ Key existing constraints:
 
 ### 2. Splash Screen: flutter_native_splash
 
-**Decision**: Use `flutter_native_splash` package. White/navy background with centered XCaro logo. Removes the ugly default white flash on Android.
+**Decision**: Use `flutter_native_splash` package. White/navy background with centered PlayVerse logo. Removes the ugly default white flash on Android.
 
 **Rationale**: Single declarative config, platform-agnostic generation.
 

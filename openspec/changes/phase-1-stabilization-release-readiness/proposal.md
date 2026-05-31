@@ -1,6 +1,6 @@
 ## Why
 
-XCaro has accumulated a large MVP feature set across authentication, WebSocket multiplayer, AI, leaderboard, chat, Redis, email verification, CI/CD, and app assets. Before adding Phase 2 features, the project needs a focused stabilization pass that turns the current MVP from "implemented" into "release-ready" through repeatable validation, high-impact warning cleanup, deployment smoke testing, and documented go/no-go criteria.
+PlayVerse has accumulated a large MVP feature set across authentication, WebSocket multiplayer, AI, leaderboard, chat, Redis, email verification, CI/CD, and app assets. Before adding Phase 2 features, the project needs a focused stabilization pass that turns the current MVP from "implemented" into "release-ready" through repeatable validation, high-impact warning cleanup, deployment smoke testing, and documented go/no-go criteria.
 
 ## What Changes
 

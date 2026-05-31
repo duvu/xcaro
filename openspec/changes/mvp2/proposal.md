@@ -1,6 +1,6 @@
 ## Why
 
-MVP1 shipped a working XCaro product: players can register, play online with real-time move sync, play against a single-difficulty AI, and browse their game history. The remaining gap is **engagement and polish** — features that turn a working app into one players return to. MVP2 closes the highest-value remaining items from the backlog: social chat, a competitive leaderboard, opponent profiles, multi-difficulty AI, email-based account verification, and the production infrastructure (rate limiting, Redis caching, CI/CD) needed to run at scale with confidence.
+MVP1 shipped a working PlayVerse product: players can register, play online with real-time move sync, play against a single-difficulty AI, and browse their game history. The remaining gap is **engagement and polish** — features that turn a working app into one players return to. MVP2 closes the highest-value remaining items from the backlog: social chat, a competitive leaderboard, opponent profiles, multi-difficulty AI, email-based account verification, and the production infrastructure (rate limiting, Redis caching, CI/CD) needed to run at scale with confidence.
 
 ## What Changes
 

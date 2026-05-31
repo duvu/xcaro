@@ -1,8 +1,8 @@
 ## Context
 
-MVP1 delivered the core XCaro stack: Flutter/Dart client (Flame + Provider), Go backend (Gin + Gorilla WebSocket + MongoDB), JWT auth with refresh tokens, real-time 15×15 Gomoku multiplayer, depth-3 AI opponent, and game history. MVP2 adds the engagement layer on top of that foundation without replacing any MVP1 work.
+MVP1 delivered the core PlayVerse stack: Flutter/Dart client (Flame + Provider), Go backend (Gin + Gorilla WebSocket + MongoDB), JWT auth with refresh tokens, real-time 15×15 Gomoku multiplayer, depth-3 AI opponent, and game history. MVP2 adds the engagement layer on top of that foundation without replacing any MVP1 work.
 
-Key existing constraints: Go module `github.com/duvu/xcaro/server`, WebSocket message envelope `{ "type", "payload" }`, 15×15 board, MongoDB document store, `just_audio` + `flutter_secure_storage` already in pubspec.
+Key existing constraints: Go module `github.com/duvu/playverse/server`, WebSocket message envelope `{ "type", "payload" }`, 15×15 board, MongoDB document store, `just_audio` + `flutter_secure_storage` already in pubspec.
 
 ## Goals / Non-Goals
 
