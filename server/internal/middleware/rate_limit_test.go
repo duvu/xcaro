@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/cache"
+	"github.com/duvu/playverse/server/internal/cache"
 	"github.com/gin-gonic/gin"
 )
 

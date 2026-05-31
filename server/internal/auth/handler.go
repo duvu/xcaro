@@ -1,10 +1,11 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/duvu/xcaro/server/pkg/models"
+	"github.com/duvu/playverse/server/pkg/models"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -12,6 +13,22 @@ import (
 // Handler xử lý các request liên quan đến authentication và user management
 type Handler struct {
 	service *Service
+}
+
+func writeProfileError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrUserNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrCurrentPasswordInvalid),
+		errors.Is(err, ErrPasswordInvalid),
+		errors.Is(err, ErrEmailAlreadyUsed),
+		errors.Is(err, ErrEmailUnchanged),
+		errors.Is(err, ErrInvalidUserID),
+		errors.Is(err, ErrEmailAlreadyVerified):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 }
 
 // NewHandler tạo một handler mới
@@ -121,7 +138,7 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	// Lấy thông tin profile
 	user, err := h.service.GetProfile(c.Request.Context(), objectID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeProfileError(c, err)
 		return
 	}
 
@@ -162,7 +179,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	// Cập nhật profile
 	if err := h.service.UpdateProfile(c.Request.Context(), objectID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeProfileError(c, err)
 		return
 	}
 
@@ -203,7 +220,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 
 	// Đổi mật khẩu
 	if err := h.service.ChangePassword(c.Request.Context(), objectID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeProfileError(c, err)
 		return
 	}
 
@@ -244,11 +261,11 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 
 	// Cập nhật email
 	if err := h.service.UpdateEmail(c.Request.Context(), objectID, &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeProfileError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "cập nhật email thành công"})
+	c.JSON(http.StatusOK, gin.H{"message": "cập nhật email thành công, vui lòng xác minh email mới"})
 }
 
 // ListUsers godoc
@@ -391,7 +408,7 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 func (h *Handler) ResendVerification(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if err := h.service.ResendVerification(c.Request.Context(), userID); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		writeProfileError(c, err)
 		return
 	}
 	c.JSON(200, gin.H{"message": "Verification email sent"})

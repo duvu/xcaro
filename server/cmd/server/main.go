@@ -2,22 +2,26 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
+	"net/url"
 	"os"
 	"time"
 
-	_ "github.com/duvu/xcaro/server/docs"
-	"github.com/duvu/xcaro/server/internal/apierrors"
-	"github.com/duvu/xcaro/server/internal/auth"
-	"github.com/duvu/xcaro/server/internal/cache"
-	"github.com/duvu/xcaro/server/internal/game"
-	"github.com/duvu/xcaro/server/internal/leaderboard"
-	"github.com/duvu/xcaro/server/internal/metrics"
-	"github.com/duvu/xcaro/server/internal/middleware"
-	"github.com/duvu/xcaro/server/internal/models"
-	"github.com/duvu/xcaro/server/internal/reports"
-	"github.com/duvu/xcaro/server/internal/ws"
+	_ "github.com/duvu/playverse/server/docs"
+	"github.com/duvu/playverse/server/internal/apierrors"
+	"github.com/duvu/playverse/server/internal/auth"
+	"github.com/duvu/playverse/server/internal/cache"
+	"github.com/duvu/playverse/server/internal/game"
+	platformgames "github.com/duvu/playverse/server/internal/games"
+	"github.com/duvu/playverse/server/internal/leaderboard"
+	"github.com/duvu/playverse/server/internal/metrics"
+	"github.com/duvu/playverse/server/internal/middleware"
+	"github.com/duvu/playverse/server/internal/models"
+	"github.com/duvu/playverse/server/internal/reports"
+	"github.com/duvu/playverse/server/internal/social"
+	"github.com/duvu/playverse/server/internal/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
@@ -26,14 +30,14 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// @title XCaro Game API
+// @title PlayVerse API
 // @version 1.0
 // @description API cho game cờ caro online với tính năng chat và voice/video call.
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
 // @contact.url http://www.swagger.io/support
-// @contact.email support@xcaro.com
+// @contact.email support@playverse.app
 
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
@@ -97,7 +101,7 @@ func main() {
 	// Khởi tạo database
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
-		dbName = "xcaro"
+		dbName = "playverse"
 	}
 	db := client.Database(dbName)
 
@@ -117,7 +121,8 @@ func main() {
 	wsHandler := ws.NewHandler(hub)
 
 	// Khởi tạo router
-	r := gin.Default()
+	r := gin.New()
+	r.Use(redactingGinLogger(), gin.Recovery())
 
 	r.Use(func(c *gin.Context) {
 		metrics.Get().IncRequests()
@@ -150,6 +155,9 @@ func main() {
 				"status": "ok",
 			})
 		})
+
+		catalogHandler := platformgames.NewHandler()
+		api.GET("/games/catalog", catalogHandler.GetCatalog)
 
 		// Auth routes
 		authGroup := api.Group("/auth")
@@ -215,6 +223,11 @@ func main() {
 
 			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
 
+			socialService := social.RegisterRoutes(protected, db)
+			if err := socialService.EnsureIndexes(ctx); err != nil {
+				log.Fatalf("Không thể tạo index social: %v", err)
+			}
+
 			reports.RegisterRoutes(protected, db)
 		}
 
@@ -248,4 +261,37 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Không thể khởi động server: %v", err)
 	}
+}
+
+func redactingGinLogger() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		return fmt.Sprintf("[GIN] %v |%3d| %13v | %15s |%-7s %#v\n",
+			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+			param.StatusCode,
+			param.Latency,
+			param.ClientIP,
+			param.Method,
+			redactSensitiveQuery(param.Path),
+		)
+	})
+}
+
+func redactSensitiveQuery(path string) string {
+	uri, err := url.ParseRequestURI(path)
+	if err != nil {
+		return path
+	}
+	query := uri.Query()
+	changed := false
+	for _, key := range []string{"token", "access_token", "refresh_token"} {
+		if _, ok := query[key]; ok {
+			query.Set(key, "[REDACTED]")
+			changed = true
+		}
+	}
+	if !changed {
+		return path
+	}
+	uri.RawQuery = query.Encode()
+	return uri.RequestURI()
 }

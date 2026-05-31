@@ -2,25 +2,29 @@ package ws
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/cache"
-	"github.com/duvu/xcaro/server/internal/elo"
+	"github.com/duvu/playverse/server/internal/cache"
+	"github.com/duvu/playverse/server/internal/elo"
+	platformgames "github.com/duvu/playverse/server/internal/games"
+	"github.com/duvu/playverse/server/internal/games/caro"
+	chessgame "github.com/duvu/playverse/server/internal/games/chess"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-const boardSize = 15
 
 type Room struct {
 	ID               string
 	Code             string
+	GameType         string
 	PlayerX          *Client
 	PlayerO          *Client
-	Board            [boardSize][boardSize]int
+	Board            [caro.BoardSize][caro.BoardSize]int
+	FEN              string
+	WinningCells     [][]int
 	Turn             int
 	Started          bool
 	GameOver         bool
@@ -36,15 +40,50 @@ type Room struct {
 }
 
 type RoomMove struct {
-	X      int
-	Y      int
-	Player int
+	X         int
+	Y         int
+	Player    int
+	From      string
+	To        string
+	Promotion string
 }
 
-func NewRoom(id, code string, db *mongo.Database) *Room {
+type RoomError struct {
+	Code    string
+	Message string
+}
+
+type gameRecordSnapshot struct {
+	GameType  string
+	RoomID    string
+	FEN       string
+	PlayerXID string
+	PlayerOID string
+	Winner    string
+	Result    string
+	Moves     []RoomMove
+	Duration  int64
+}
+
+func (e RoomError) Error() string {
+	return e.Message
+}
+
+func roomError(code, message string) error {
+	return RoomError{Code: code, Message: message}
+}
+
+func NewRoom(id, code, gameType string, db *mongo.Database) *Room {
+	gt := platformgames.NormalizeGameType(gameType)
+	fen := ""
+	if gt == platformgames.GameTypeChess {
+		fen = chessgame.StartingFEN
+	}
 	return &Room{
 		ID:               id,
 		Code:             code,
+		GameType:         gt,
+		FEN:              fen,
 		Turn:             1,
 		CreatedAt:        time.Now(),
 		LastActivity:     time.Now(),
@@ -54,14 +93,28 @@ func NewRoom(id, code string, db *mongo.Database) *Room {
 }
 
 func (r *Room) MakeMove(userID string, x, y int) error {
+	_, _, err := r.ApplyCaroMove(userID, x, y)
+	return err
+}
+
+func (r *Room) MakeChessMove(userID, from, to, promotion string) error {
+	_, _, err := r.ApplyChessMove(userID, from, to, promotion)
+	return err
+}
+
+func (r *Room) ApplyMove(userID string, x, y int) (map[string]interface{}, bool, error) {
+	return r.ApplyCaroMove(userID, x, y)
+}
+
+func (r *Room) ApplyCaroMove(userID string, x, y int) (map[string]interface{}, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.GameOver {
-		return errors.New("game đã kết thúc")
+		return nil, false, roomError("game_already_over", "Game is already over")
 	}
 	if !r.Started {
-		return errors.New("game chưa bắt đầu")
+		return nil, false, roomError("game_not_started", "Game has not started")
 	}
 
 	var player int
@@ -70,42 +123,45 @@ func (r *Room) MakeMove(userID string, x, y int) error {
 	} else if r.PlayerO != nil && r.PlayerO.UserID == userID {
 		player = 2
 	} else {
-		return errors.New("bạn không phải người chơi trong phòng này")
+		return nil, false, roomError("not_a_player", "You are not a player in this room")
 	}
 
 	if r.Turn != player {
-		return errors.New("chưa đến lượt của bạn")
+		return nil, false, roomError("not_your_turn", "It is not your turn")
 	}
 
-	if x < 0 || x >= boardSize || y < 0 || y >= boardSize {
-		return errors.New("vị trí không hợp lệ")
-	}
-	if r.Board[x][y] != 0 {
-		return errors.New("ô đã được đánh")
+	outcome, err := caro.ApplyMove(&r.Board, player, x, y)
+	if err != nil {
+		switch err {
+		case caro.ErrInvalidCoordinates:
+			return nil, false, roomError("invalid_coordinates", "Move coordinates are outside the board")
+		case caro.ErrCellOccupied:
+			return nil, false, roomError("cell_occupied", "Cell is already occupied")
+		default:
+			return nil, false, err
+		}
 	}
 
-	r.Board[x][y] = player
 	r.Moves = append(r.Moves, RoomMove{X: x, Y: y, Player: player})
 	r.LastActivity = time.Now()
+	r.WinningCells = outcome.WinningCells
 
-	if r.CheckWin(player) {
+	if len(outcome.WinningCells) > 0 {
 		r.GameOver = true
 		r.Winner = userID
 		r.Result = "win"
-		if r.db != nil {
-			go r.saveGameRecord()
-		}
-		return nil
+		state := r.toGameStateLocked()
+		r.saveCompletedGameLocked()
+		return state, true, nil
 	}
 
-	if r.IsDraw() {
+	if outcome.Draw {
 		r.GameOver = true
 		r.Winner = ""
 		r.Result = "draw"
-		if r.db != nil {
-			go r.saveGameRecord()
-		}
-		return nil
+		state := r.toGameStateLocked()
+		r.saveCompletedGameLocked()
+		return state, true, nil
 	}
 
 	if r.Turn == 1 {
@@ -114,76 +170,147 @@ func (r *Room) MakeMove(userID string, x, y int) error {
 		r.Turn = 1
 	}
 
-	return nil
+	return r.toGameStateLocked(), false, nil
 }
 
-func (r *Room) CheckWin(player int) bool {
-	dirs := [][2]int{{0, 1}, {1, 0}, {1, 1}, {1, -1}}
-	for _, d := range dirs {
-		dx, dy := d[0], d[1]
-		for x := 0; x < boardSize; x++ {
-			for y := 0; y < boardSize; y++ {
-				if r.Board[x][y] != player {
-					continue
-				}
-				count := 1
-				for k := 1; k < 5; k++ {
-					nx, ny := x+k*dx, y+k*dy
-					if nx < 0 || nx >= boardSize || ny < 0 || ny >= boardSize {
-						break
-					}
-					if r.Board[nx][ny] != player {
-						break
-					}
-					count++
-				}
-				if count >= 5 {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
+func (r *Room) ApplyChessMove(userID, from, to, promotion string) (map[string]interface{}, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-func (r *Room) IsDraw() bool {
-	for x := 0; x < boardSize; x++ {
-		for y := 0; y < boardSize; y++ {
-			if r.Board[x][y] == 0 {
-				return false
-			}
+	if r.GameOver {
+		return nil, false, roomError("game_already_over", "Game is already over")
+	}
+	if !r.Started {
+		return nil, false, roomError("game_not_started", "Game has not started")
+	}
+
+	var player int
+	if r.PlayerX != nil && r.PlayerX.UserID == userID {
+		player = 1
+	} else if r.PlayerO != nil && r.PlayerO.UserID == userID {
+		player = 2
+	} else {
+		return nil, false, roomError("not_a_player", "You are not a player in this room")
+	}
+
+	if r.Turn != player {
+		return nil, false, roomError("not_your_turn", "It is not your turn")
+	}
+
+	outcome, err := chessgame.ApplyMove(r.FEN, from, to, promotion)
+	if err != nil {
+		switch err {
+		case chessgame.ErrInvalidSquare:
+			return nil, false, roomError("invalid_coordinates", "Invalid chess square")
+		case chessgame.ErrIllegalMove:
+			return nil, false, roomError("illegal_move", "That move is not legal in the current position")
+		default:
+			return nil, false, err
 		}
 	}
-	return true
+
+	r.FEN = outcome.NewFEN
+	r.Moves = append(r.Moves, RoomMove{From: from, To: to, Promotion: promotion, Player: player})
+	r.LastActivity = time.Now()
+
+	if r.Turn == 1 {
+		r.Turn = 2
+	} else {
+		r.Turn = 1
+	}
+
+	if outcome.GameOver {
+		r.GameOver = true
+		r.Result = outcome.Result
+		if outcome.Winner == "white" {
+			if r.PlayerX != nil {
+				r.Winner = r.PlayerX.UserID
+			}
+		} else if outcome.Winner == "black" {
+			if r.PlayerO != nil {
+				r.Winner = r.PlayerO.UserID
+			}
+		}
+		state := r.toGameStateLocked()
+		r.saveCompletedGameLocked()
+		return state, true, nil
+	}
+
+	return r.toGameStateLocked(), false, nil
 }
 
 func (r *Room) ToGameState() map[string]interface{} {
-	boardCopy := make([][]int, boardSize)
-	for i := range boardCopy {
-		row := make([]int, boardSize)
-		copy(row, r.Board[i][:])
-		boardCopy[i] = row
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.toGameStateLocked()
+}
+
+func (r *Room) toGameStateLocked() map[string]interface{} {
+	playerX := playerPayload(r.PlayerX)
+	playerO := playerPayload(r.PlayerO)
+	players := map[string]interface{}{"x": playerX, "o": playerO}
+
+	currentTurn := ""
+	if r.Turn == 1 && r.PlayerX != nil {
+		currentTurn = r.PlayerX.UserID
+	} else if r.Turn == 2 && r.PlayerO != nil {
+		currentTurn = r.PlayerO.UserID
 	}
 
-	players := map[string]interface{}{}
-	if r.PlayerX != nil {
-		players["x"] = map[string]string{"user_id": r.PlayerX.UserID, "username": r.PlayerX.Username}
-	}
-	if r.PlayerO != nil {
-		players["o"] = map[string]string{"user_id": r.PlayerO.UserID, "username": r.PlayerO.Username}
+	winningCells := r.WinningCells
+	if winningCells == nil {
+		winningCells = make([][]int, 0)
 	}
 
-	return map[string]interface{}{
-		"room_id":   r.ID,
-		"code":      r.Code,
-		"board":     boardCopy,
-		"turn":      r.Turn,
-		"started":   r.Started,
-		"game_over": r.GameOver,
-		"winner":    r.Winner,
-		"result":    r.Result,
-		"players":   players,
+	status := "waiting"
+	if r.GameOver {
+		status = "finished"
+	} else if r.Started {
+		status = "active"
 	}
+
+	state := map[string]interface{}{
+		"game_type":     r.GameType,
+		"room_id":       r.ID,
+		"room_code":     r.Code,
+		"code":          r.Code,
+		"turn":          r.Turn,
+		"current_turn":  currentTurn,
+		"started":       r.Started,
+		"game_over":     r.GameOver,
+		"winner":        r.Winner,
+		"result":        r.Result,
+		"status":        status,
+		"players":       players,
+		"player_x":      playerX,
+		"player_o":      playerO,
+		"winning_cells": winningCells,
+	}
+
+	if r.GameType == platformgames.GameTypeChess {
+		state["fen"] = r.FEN
+	} else {
+		boardCopy := make([][]int, caro.BoardSize)
+		for i := range boardCopy {
+			row := make([]int, caro.BoardSize)
+			copy(row, r.Board[i][:])
+			boardCopy[i] = row
+		}
+		state["board"] = boardCopy
+	}
+
+	return state
+}
+
+func playerPayload(client *Client) map[string]string {
+	if client == nil {
+		return nil
+	}
+	username := client.Username
+	if username == "" {
+		username = client.UserID
+	}
+	return map[string]string{"user_id": client.UserID, "username": username}
 }
 
 func (r *Room) GetOpponent(userID string) *Client {
@@ -208,9 +335,21 @@ func (r *Room) PlayerCount() int {
 }
 
 func (r *Room) saveGameRecord() {
+	r.mu.Lock()
+	snapshot := r.gameRecordSnapshotLocked()
+	r.mu.Unlock()
+	r.saveGameRecordSnapshot(snapshot)
+}
+
+func (r *Room) saveCompletedGameLocked() {
 	if r.db == nil {
 		return
 	}
+	snapshot := r.gameRecordSnapshotLocked()
+	go r.saveGameRecordSnapshot(snapshot)
+}
+
+func (r *Room) gameRecordSnapshotLocked() gameRecordSnapshot {
 	playerXID := ""
 	if r.PlayerX != nil {
 		playerXID = r.PlayerX.UserID
@@ -224,36 +363,75 @@ func (r *Room) saveGameRecord() {
 	if !r.StartedAt.IsZero() {
 		duration = int64(time.Since(r.StartedAt).Seconds())
 	}
+	moves := make([]RoomMove, len(r.Moves))
+	copy(moves, r.Moves)
 
-	moves := make([]interface{}, 0, len(r.Moves))
-	for _, m := range r.Moves {
-		moves = append(moves, map[string]interface{}{
-			"x": m.X, "y": m.Y, "player": m.Player,
-		})
+	return gameRecordSnapshot{
+		GameType:  r.GameType,
+		RoomID:    r.ID,
+		FEN:       r.FEN,
+		PlayerXID: playerXID,
+		PlayerOID: playerOID,
+		Winner:    r.Winner,
+		Result:    r.Result,
+		Moves:     moves,
+		Duration:  duration,
+	}
+}
+
+func (r *Room) saveGameRecordSnapshot(snapshot gameRecordSnapshot) {
+	if r.db == nil {
+		return
+	}
+
+	moves := make([]interface{}, 0, len(snapshot.Moves))
+	for _, m := range snapshot.Moves {
+		if snapshot.GameType == platformgames.GameTypeChess {
+			moves = append(moves, map[string]interface{}{
+				"from": m.From, "to": m.To, "promotion": m.Promotion, "player": m.Player,
+			})
+		} else {
+			moves = append(moves, map[string]interface{}{
+				"x": m.X, "y": m.Y, "player": m.Player,
+			})
+		}
 	}
 
 	eloDeltaX := 0
 	eloDeltaO := 0
 
-	if r.Result != "resign" && r.Result != "forfeit" && playerXID != "" && playerOID != "" {
-		eloDeltaX, eloDeltaO = r.updateEloRatings(playerXID, playerOID)
+	if snapshot.PlayerXID != "" && snapshot.PlayerOID != "" {
+		eloDeltaX, eloDeltaO = r.updateEloRatings(snapshot.PlayerXID, snapshot.PlayerOID, snapshot.Winner)
 	}
 
 	doc := map[string]interface{}{
-		"player_x":    playerXID,
-		"player_o":    playerOID,
-		"winner":      r.Winner,
-		"result":      r.Result,
+		"game_type": snapshot.GameType,
+		"room_id":   snapshot.RoomID,
+		"player_x":  snapshot.PlayerXID,
+		"player_o":  snapshot.PlayerOID,
+		"players": []map[string]interface{}{
+			{"user_id": snapshot.PlayerXID, "seat": "x"},
+			{"user_id": snapshot.PlayerOID, "seat": "o"},
+		},
+		"winner":      snapshot.Winner,
+		"result":      snapshot.Result,
 		"moves":       moves,
-		"duration":    duration,
+		"duration":    snapshot.Duration,
 		"elo_delta_x": eloDeltaX,
 		"elo_delta_o": eloDeltaO,
-		"created_at":  time.Now(),
+		"rating_changes": []map[string]interface{}{
+			{"user_id": snapshot.PlayerXID, "delta": eloDeltaX},
+			{"user_id": snapshot.PlayerOID, "delta": eloDeltaO},
+		},
+		"created_at": time.Now(),
+	}
+	if snapshot.FEN != "" {
+		doc["final_fen"] = snapshot.FEN
 	}
 	_, _ = r.db.Collection("game_records").InsertOne(context.Background(), doc)
 }
 
-func (r *Room) updateEloRatings(playerXID, playerOID string) (deltaX, deltaO int) {
+func (r *Room) updateEloRatings(playerXID, playerOID, winner string) (deltaX, deltaO int) {
 	ctx := context.Background()
 
 	xObjID, err := primitive.ObjectIDFromHex(playerXID)
@@ -285,9 +463,9 @@ func (r *Room) updateEloRatings(playerXID, playerOID string) (deltaX, deltaO int
 	}
 
 	var result float64
-	if r.Winner == playerXID {
+	if winner == playerXID {
 		result = 1.0
-	} else if r.Winner == playerOID {
+	} else if winner == playerOID {
 		result = 0.0
 	} else {
 		result = 0.5
@@ -299,8 +477,11 @@ func (r *Room) updateEloRatings(playerXID, playerOID string) (deltaX, deltaO int
 
 	r.db.Collection("users").UpdateOne(ctx, bson.M{"_id": xObjID}, bson.M{"$set": bson.M{"elo_rating": newX}})
 	r.db.Collection("users").UpdateOne(ctx, bson.M{"_id": oObjID}, bson.M{"$set": bson.M{"elo_rating": newO}})
+	r.db.Collection("user_game_ratings").UpdateOne(ctx, bson.M{"user_id": playerXID, "game_type": r.GameType}, bson.M{"$set": bson.M{"rating": newX, "updated_at": time.Now()}, "$setOnInsert": bson.M{"user_id": playerXID, "game_type": r.GameType}}, options.Update().SetUpsert(true))
+	r.db.Collection("user_game_ratings").UpdateOne(ctx, bson.M{"user_id": playerOID, "game_type": r.GameType}, bson.M{"$set": bson.M{"rating": newO, "updated_at": time.Now()}, "$setOnInsert": bson.M{"user_id": playerOID, "game_type": r.GameType}}, options.Update().SetUpsert(true))
 
 	cache.Del(ctx, "leaderboard:top50")
+	cache.Del(ctx, "leaderboard:top50:"+r.GameType)
 	cache.Del(ctx, "stats:"+playerXID)
 	cache.Del(ctx, "stats:"+playerOID)
 

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/ws"
-	"github.com/duvu/xcaro/server/pkg/models"
+	"github.com/duvu/playverse/server/internal/ws"
+	"github.com/duvu/playverse/server/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"

@@ -37,7 +37,7 @@ func SendVerificationEmail(to, token string) error {
 	if err := m.To(to); err != nil {
 		return err
 	}
-	m.Subject("Verify your XCaro email")
+	m.Subject("Verify your PlayVerse email")
 	m.SetBodyString(gomail.TypeTextHTML, fmt.Sprintf(`<p>Click <a href="%s">here</a> to verify your email. Link expires in 24 hours.</p>`, link))
 
 	c, err := gomail.NewClient(host, gomail.WithPort(port),

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/middleware"
+	"github.com/duvu/playverse/server/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

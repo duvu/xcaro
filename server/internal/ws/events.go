@@ -7,10 +7,13 @@ const (
 	EventGameMove  = "game_move"
 	EventGameOver  = "game_over"
 
-	EventJoinRoom   = "join_room"
-	EventLeaveRoom  = "leave_room"
-	EventMakeMove   = "make_move"
-	EventResign     = "resign"
+	EventCreateRoom     = "create_room"
+	EventJoinRoom       = "join_room"
+	EventJoinRoomByCode = "join_room_by_code"
+	EventRejoinRoom     = "rejoin_room"
+	EventLeaveRoom      = "leave_room"
+	EventMakeMove       = "make_move"
+	EventResign         = "resign"
 
 	EventRoomUpdate  = "room_update"
 	EventPlayerJoin  = "player_join"
@@ -22,6 +25,7 @@ const (
 	EventStreamStatus = "stream_status"
 
 	EventQuickMatchRequest   = "quick_match_request"
+	EventQuickMatchCancel    = "quick_match_cancel"
 	EventQuickMatchFound     = "quick_match_found"
 	EventQuickMatchCancelled = "quick_match_cancelled"
 	EventQuickMatchTimeout   = "quick_match_timeout"
@@ -37,12 +41,12 @@ const (
 	MessageTypeIceCandidate = "ice-candidate"
 )
 
-
 // WSMessage định nghĩa cấu trúc message WebSocket
 type WSMessage struct {
-	Type    string      `json:"type"`              // Loại event
-	RoomID  string      `json:"room_id,omitempty"` // ID phòng (nếu có)
-	Payload interface{} `json:"payload"`           // Dữ liệu của event
+	Type     string      `json:"type"` // Loại event
+	GameType string      `json:"game_type,omitempty"`
+	RoomID   string      `json:"room_id,omitempty"` // ID phòng (nếu có)
+	Payload  interface{} `json:"payload"`           // Dữ liệu của event
 }
 
 // GameStatePayload payload cho event game state

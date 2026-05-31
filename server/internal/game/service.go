@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/ws"
-	"github.com/duvu/xcaro/server/pkg/models"
+	"github.com/duvu/playverse/server/internal/ws"
+	"github.com/duvu/playverse/server/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

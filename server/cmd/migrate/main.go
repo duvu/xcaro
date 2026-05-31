@@ -31,7 +31,7 @@ func main() {
 
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
-		dbName = "xcaro"
+		dbName = "playverse"
 	}
 	db := client.Database(dbName)
 

@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/cache"
+	"github.com/duvu/playverse/server/internal/cache"
+	platformgames "github.com/duvu/playverse/server/internal/games"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -32,17 +33,23 @@ type LeaderboardEntry struct {
 
 func (h *Handler) GetLeaderboard(c *gin.Context) {
 	ctx := context.Background()
-	cacheKey := "leaderboard:top50"
+	gameType := platformgames.NormalizeGameType(c.DefaultQuery("game_type", platformgames.GameTypeCaro))
+	cacheKey := "leaderboard:top50:" + gameType
 
 	if cache.RedisClient != nil {
 		if cached, err := cache.Get(ctx, cacheKey); err == nil {
 			var entries []LeaderboardEntry
 			if json.Unmarshal([]byte(cached), &entries) == nil {
 				c.Header("X-Cache", "HIT")
-				c.JSON(http.StatusOK, gin.H{"leaderboard": entries})
+				c.JSON(http.StatusOK, gin.H{"game_type": gameType, "leaderboard": entries})
 				return
 			}
 		}
+	}
+
+	if gameType != platformgames.GameTypeCaro {
+		h.getPerGameLeaderboard(c, ctx, gameType, cacheKey)
+		return
 	}
 
 	opts := options.Find().SetSort(bson.D{{Key: "elo_rating", Value: -1}}).SetLimit(50)
@@ -78,7 +85,47 @@ func (h *Handler) GetLeaderboard(c *gin.Context) {
 	}
 
 	c.Header("X-Cache", "MISS")
-	c.JSON(200, gin.H{"leaderboard": entries})
+	c.JSON(200, gin.H{"game_type": gameType, "leaderboard": entries})
+}
+
+func (h *Handler) getPerGameLeaderboard(c *gin.Context, ctx context.Context, gameType, cacheKey string) {
+	opts := options.Find().SetSort(bson.D{{Key: "rating", Value: -1}}).SetLimit(50)
+	cursor, err := h.db.Collection("user_game_ratings").Find(ctx, bson.M{"game_type": gameType}, opts)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	entries := make([]LeaderboardEntry, 0)
+	rank := 1
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		userID := getStr(doc, "user_id")
+		user := bson.M{}
+		if objectID, err := primitive.ObjectIDFromHex(userID); err == nil {
+			_ = h.db.Collection("users").FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
+		}
+		entries = append(entries, LeaderboardEntry{
+			Rank:        rank,
+			Username:    getStr(user, "username"),
+			Avatar:      getStr(user, "avatar"),
+			EloRating:   getInt(doc, "rating"),
+			GamesPlayed: getInt(doc, "games_played"),
+		})
+		rank++
+	}
+	if cache.RedisClient != nil {
+		if data, err := json.Marshal(entries); err == nil {
+			cache.Set(ctx, cacheKey, string(data), 5*time.Minute)
+		}
+	}
+	c.Header("X-Cache", "MISS")
+	c.JSON(http.StatusOK, gin.H{"game_type": gameType, "leaderboard": entries})
 }
 
 func (h *Handler) GetUserProfile(c *gin.Context) {
@@ -113,13 +160,13 @@ func (h *Handler) GetUserProfile(c *gin.Context) {
 	rank, _ := h.db.Collection("users").CountDocuments(ctx, bson.M{"elo_rating": bson.M{"$gt": elo}})
 
 	c.JSON(200, gin.H{
-		"username":     getStr(user, "username"),
-		"avatar":       getStr(user, "avatar"),
-		"elo_rating":   elo,
-		"rank":         rank + 1,
-		"wins":         wins,
-		"losses":       losses,
-		"draws":        draws,
+		"username":   getStr(user, "username"),
+		"avatar":     getStr(user, "avatar"),
+		"elo_rating": elo,
+		"rank":       rank + 1,
+		"wins":       wins,
+		"losses":     losses,
+		"draws":      draws,
 	})
 }
 

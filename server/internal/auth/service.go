@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/duvu/xcaro/server/internal/email"
-	"github.com/duvu/xcaro/server/pkg/models"
+	"github.com/duvu/playverse/server/internal/email"
+	"github.com/duvu/playverse/server/pkg/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,6 +21,18 @@ import (
 type Service struct {
 	db *mongo.Database
 }
+
+var (
+	ErrUserNotFound            = errors.New("không tìm thấy người dùng")
+	ErrCurrentPasswordInvalid  = errors.New("mật khẩu hiện tại không đúng")
+	ErrPasswordInvalid         = errors.New("mật khẩu không đúng")
+	ErrEmailAlreadyUsed        = errors.New("email đã được sử dụng")
+	ErrEmailUnchanged          = errors.New("email mới phải khác email hiện tại")
+	ErrInvalidUserID           = errors.New("user ID không hợp lệ")
+	ErrEmailAlreadyVerified    = errors.New("email đã được xác minh")
+	ErrInvalidVerificationLink = errors.New("invalid or expired token")
+	ErrExpiredVerificationLink = errors.New("token has expired")
+)
 
 func NewService(db *mongo.Database) *Service {
 	return &Service{db: db}
@@ -221,7 +233,7 @@ func (s *Service) GetProfile(ctx context.Context, userID primitive.ObjectID) (*m
 	err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, errors.New("không tìm thấy người dùng")
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -229,11 +241,16 @@ func (s *Service) GetProfile(ctx context.Context, userID primitive.ObjectID) (*m
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, userID primitive.ObjectID, req *models.UpdateProfileRequest) error {
+	dateOfBirth := any(req.DateOfBirth)
+	if req.DateOfBirth.IsZero() {
+		dateOfBirth = nil
+	}
+
 	update := bson.M{
 		"$set": bson.M{
 			"full_name":     req.FullName,
 			"avatar":        req.Avatar,
-			"date_of_birth": req.DateOfBirth,
+			"date_of_birth": dateOfBirth,
 			"phone_number":  req.PhoneNumber,
 			"bio":           req.Bio,
 			"updated_at":    time.Now(),
@@ -245,7 +262,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID primitive.ObjectID, 
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errors.New("không tìm thấy người dùng")
+		return ErrUserNotFound
 	}
 	return nil
 }
@@ -255,12 +272,15 @@ func (s *Service) ChangePassword(ctx context.Context, userID primitive.ObjectID,
 	var user models.User
 	err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return ErrUserNotFound
+		}
 		return err
 	}
 
 	// Kiểm tra mật khẩu hiện tại
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
-		return errors.New("mật khẩu hiện tại không đúng")
+		return ErrCurrentPasswordInvalid
 	}
 
 	// Hash mật khẩu mới
@@ -282,38 +302,60 @@ func (s *Service) ChangePassword(ctx context.Context, userID primitive.ObjectID,
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errors.New("không tìm thấy người dùng")
+		return ErrUserNotFound
 	}
 	return nil
 }
 
 func (s *Service) UpdateEmail(ctx context.Context, userID primitive.ObjectID, req *models.UpdateEmailRequest) error {
 	// Kiểm tra email mới đã tồn tại chưa
-	count, err := s.db.Collection("users").CountDocuments(ctx, bson.M{"email": req.NewEmail})
+	count, err := s.db.Collection("users").CountDocuments(ctx, bson.M{
+		"email": req.NewEmail,
+		"_id":   bson.M{"$ne": userID},
+	})
 	if err != nil {
 		return err
 	}
 	if count > 0 {
-		return errors.New("email đã được sử dụng")
+		return ErrEmailAlreadyUsed
 	}
 
 	// Lấy thông tin user hiện tại
 	var user models.User
 	err = s.db.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return ErrUserNotFound
+		}
 		return err
+	}
+
+	if user.Email == req.NewEmail {
+		return ErrEmailUnchanged
 	}
 
 	// Kiểm tra mật khẩu
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return errors.New("mật khẩu không đúng")
+		return ErrPasswordInvalid
 	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return err
+	}
+	plainToken := hex.EncodeToString(tokenBytes)
+	hash := sha256.Sum256([]byte(plainToken))
+	hashedToken := hex.EncodeToString(hash[:])
+	now := time.Now()
 
 	// Cập nhật email
 	update := bson.M{
 		"$set": bson.M{
-			"email":      req.NewEmail,
-			"updated_at": time.Now(),
+			"email":                   req.NewEmail,
+			"email_verified":          false,
+			"email_verify_token":      hashedToken,
+			"email_verify_expires_at": now.Add(24 * time.Hour),
+			"updated_at":              now,
 		},
 	}
 
@@ -322,8 +364,15 @@ func (s *Service) UpdateEmail(ctx context.Context, userID primitive.ObjectID, re
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return errors.New("không tìm thấy người dùng")
+		return ErrUserNotFound
 	}
+
+	go func() {
+		if err := email.SendVerificationEmail(req.NewEmail, plainToken); err != nil {
+			slog.Error("send verification email failed", "event", "update_email", "email", req.NewEmail, "error", err)
+		}
+	}()
+
 	return nil
 }
 
@@ -440,13 +489,13 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	err := s.db.Collection("users").FindOne(ctx, bson.M{"email_verify_token": hashedToken}).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return errors.New("invalid or expired token")
+			return ErrInvalidVerificationLink
 		}
 		return err
 	}
 
 	if time.Now().After(user.EmailVerifyExpiresAt) {
-		return errors.New("token has expired")
+		return ErrExpiredVerificationLink
 	}
 
 	_, err = s.db.Collection("users").UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
@@ -459,15 +508,15 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 func (s *Service) ResendVerification(ctx context.Context, userID string) error {
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return errors.New("invalid user ID")
+		return ErrInvalidUserID
 	}
 
 	var user models.User
 	if err := s.db.Collection("users").FindOne(ctx, bson.M{"_id": objectID}).Decode(&user); err != nil {
-		return errors.New("user not found")
+		return ErrUserNotFound
 	}
 	if user.EmailVerified {
-		return errors.New("email already verified")
+		return ErrEmailAlreadyVerified
 	}
 
 	tokenBytes := make([]byte, 32)

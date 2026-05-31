@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	platformgames "github.com/duvu/playverse/server/internal/games"
 	"github.com/gorilla/websocket"
 )
 
@@ -44,6 +45,27 @@ type incomingMessage struct {
 	Payload map[string]interface{} `json:"payload"`
 }
 
+func payloadString(payload map[string]interface{}, key string) (string, bool) {
+	value, ok := payload[key]
+	if !ok {
+		return "", false
+	}
+	text, ok := value.(string)
+	return text, ok && text != ""
+}
+
+func payloadInt(payload map[string]interface{}, key string) (int, bool) {
+	value, ok := payload[key]
+	if !ok {
+		return 0, false
+	}
+	number, ok := value.(float64)
+	if !ok {
+		return 0, false
+	}
+	return int(number), true
+}
+
 func (c *Client) ReadPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -69,33 +91,62 @@ func (c *Client) ReadPump() {
 		var msg incomingMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
 			slog.Warn("invalid message", "error", err, "user_id", c.UserID)
+			c.hub.sendError(c, "invalid_json", "Message must be valid JSON")
 			continue
+		}
+		if msg.Payload == nil {
+			msg.Payload = map[string]interface{}{}
 		}
 
 		switch msg.Type {
-		case EventJoinRoom:
-			code := ""
-			if v, ok := msg.Payload["code"]; ok {
-				code, _ = v.(string)
+		case EventCreateRoom:
+			gameType, _ := payloadString(msg.Payload, "game_type")
+			c.hub.HandleCreateRoom(c, gameType)
+
+		case EventJoinRoom, EventJoinRoomByCode:
+			code, ok := payloadString(msg.Payload, "code")
+			if !ok {
+				c.hub.sendError(c, "invalid_payload", "Room code is required")
+				continue
 			}
-			c.hub.HandleJoinRoom(c, code)
+			gameType, _ := payloadString(msg.Payload, "game_type")
+			c.hub.HandleJoinRoom(c, code, gameType)
+
+		case EventRejoinRoom:
+			roomID, _ := payloadString(msg.Payload, "room_id")
+			code, _ := payloadString(msg.Payload, "code")
+			if roomID == "" && code == "" {
+				c.hub.sendError(c, "invalid_payload", "room_id or code is required")
+				continue
+			}
+			c.hub.HandleRejoinRoom(c, roomID, code)
 
 		case EventMakeMove:
-			x, y := 0, 0
-			if v, ok := msg.Payload["x"]; ok {
-				if f, ok := v.(float64); ok {
-					x = int(f)
+			gameType, _ := payloadString(msg.Payload, "game_type")
+			if platformgames.NormalizeGameType(gameType) == platformgames.GameTypeChess {
+				from, okFrom := payloadString(msg.Payload, "from")
+				to, okTo := payloadString(msg.Payload, "to")
+				if !okFrom || !okTo {
+					c.hub.sendError(c, "invalid_payload", "Chess move payload requires from and to squares")
+					continue
 				}
-			}
-			if v, ok := msg.Payload["y"]; ok {
-				if f, ok := v.(float64); ok {
-					y = int(f)
+				promotion, _ := payloadString(msg.Payload, "promotion")
+				c.hub.HandleChessMakeMove(c, from, to, promotion)
+			} else {
+				x, okX := payloadInt(msg.Payload, "x")
+				y, okY := payloadInt(msg.Payload, "y")
+				if !okX || !okY {
+					c.hub.sendError(c, "invalid_payload", "Move payload requires numeric x and y")
+					continue
 				}
+				c.hub.HandleMakeMove(c, x, y)
 			}
-			c.hub.HandleMakeMove(c, x, y)
 
 		case EventResign:
 			c.hub.HandleResign(c)
+
+		case EventLeaveRoom:
+			c.hub.HandleLeaveGameRoom(c)
 
 		case EventGameMove:
 			if c.CurrentRoom != "" {
@@ -109,13 +160,17 @@ func (c *Client) ReadPump() {
 			c.hub.HandleChatMessage(c, Message{Type: msg.Type, Payload: msg.Payload})
 
 		case EventQuickMatchRequest:
-			c.hub.EnqueueQuickMatch(c)
+			gameType, _ := payloadString(msg.Payload, "game_type")
+			c.hub.EnqueueQuickMatch(c, platformgames.NormalizeGameType(gameType))
 
-		case "quick_match_cancel":
+		case EventQuickMatchCancel:
 			c.hub.DequeueQuickMatch(c)
 
 		case EventPing:
-			c.send <- &WSMessage{Type: EventPong}
+			c.Send(&WSMessage{Type: EventPong})
+
+		default:
+			c.hub.sendError(c, "unknown_event", "Unsupported WebSocket event")
 		}
 	}
 }
@@ -188,10 +243,20 @@ func (c *Client) LeaveRoom() {
 }
 
 func (c *Client) Send(message *WSMessage) {
+	defer func() {
+		if recover() != nil {
+			slog.Warn("websocket send channel closed", "user_id", c.UserID)
+		}
+	}()
+
 	select {
 	case c.send <- message:
 	default:
-		close(c.send)
-		delete(c.hub.clients, c)
+		c.hub.mu.Lock()
+		if c.hub.clients[c] {
+			delete(c.hub.clients, c)
+			close(c.send)
+		}
+		c.hub.mu.Unlock()
 	}
 }

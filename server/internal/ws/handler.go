@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/duvu/xcaro/server/pkg/models"
+	"github.com/duvu/playverse/server/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -47,6 +47,9 @@ func (h *Handler) Connect(c *gin.Context) {
 	// Lấy thông tin user từ context
 	userID := c.GetString("user_id")
 	username := c.GetString("username")
+	if username == "" {
+		username = h.hub.usernameForUser(userID)
+	}
 
 	// Tạo client mới
 	client := NewClient(h.hub, conn, userID, username)

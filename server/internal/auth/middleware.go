@@ -4,27 +4,37 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/duvu/xcaro/server/internal/models"
+	"github.com/duvu/playverse/server/internal/models"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		tokenString := ""
+
+		if authHeader != "" {
+			// Kiểm tra format "Bearer <token>"
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "format token không hợp lệ"})
+				return
+			}
+			tokenString = parts[1]
+		} else if strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
+			tokenString = c.Query("token")
+			if tokenString == "" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "không tìm thấy token"})
+				return
+			}
+		} else {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "không tìm thấy token"})
 			return
 		}
 
-		// Kiểm tra format "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "format token không hợp lệ"})
-			return
-		}
-
 		// Xác thực token
-		claims, err := ValidateToken(parts[1])
+		claims, err := ValidateToken(tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
@@ -32,6 +42,9 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Lưu thông tin user vào context
 		c.Set("user_id", claims.UserID)
+		if objectID, err := primitive.ObjectIDFromHex(claims.UserID); err == nil {
+			c.Set("userID", objectID)
+		}
 		c.Next()
 	}
 }
