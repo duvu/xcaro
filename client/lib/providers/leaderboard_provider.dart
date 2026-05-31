@@ -35,12 +35,12 @@ class LeaderboardProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
-  Future<void> fetchLeaderboard(ApiService api) async {
+  Future<void> fetchLeaderboard(ApiService api, {String? gameType}) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      final data = await api.getLeaderboard();
+      final data = await api.getLeaderboard(gameType: gameType);
       _entries = (data['leaderboard'] as List<dynamic>)
           .map((e) => LeaderboardEntry.fromJson(e as Map<String, dynamic>))
           .toList();

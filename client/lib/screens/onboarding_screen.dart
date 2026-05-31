@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final bool forceShow;
@@ -67,20 +71,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onPageChanged: _onPageChanged,
                 children: [
                   const _OnboardingPage(
-                    icon: Icons.extension,
                     title: 'Cờ Caro là gì?',
                     description:
                         'Cờ Caro (Gomoku) là trò chơi trí tuệ cho 2 người trên bàn cờ 15×15. '
                         'Mỗi người lần lượt đặt quân cờ của mình (X hoặc O). '
                         'Mục tiêu là tạo ra 5 quân liên tiếp trước đối thủ.',
+                    svgAsset: 'assets/images/board.svg',
                   ),
                   const _OnboardingPage(
-                    icon: Icons.touch_app,
                     title: 'Cách đặt quân',
                     description:
                         'Chạm vào ô trống bất kỳ trên bàn cờ để đặt quân của bạn. '
                         'Bạn chỉ có thể đặt quân khi đến lượt của mình. '
                         'Lượt chơi sẽ luân phiên giữa hai người.',
+                    svgAsset: 'assets/images/stone_black.svg',
                   ),
                   _WinConditionPage(circleAnimations: _circleAnimations),
                   _GetStartedPage(onPressed: _complete),
@@ -99,9 +103,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     height: 8,
                     decoration: BoxDecoration(
                       color: _currentPage == i
-                          ? Theme.of(context).colorScheme.primary
+                          ? AppColors.secondary
                           : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
                     ),
                   );
                 }),
@@ -115,37 +119,37 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 }
 
 class _OnboardingPage extends StatelessWidget {
-  final IconData icon;
   final String title;
   final String description;
+  final String? svgAsset;
 
   const _OnboardingPage({
-    required this.icon,
     required this.title,
     required this.description,
+    this.svgAsset,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 80, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 32),
+          // SVG illustration if available; fall back to stone icon
+          svgAsset != null
+              ? SvgPicture.asset(svgAsset!, width: 80, height: 80)
+              : const Icon(Icons.extension, size: 80, color: Colors.blue),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             title,
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.headlineMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(
             description,
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: AppTextStyles.bodyLarge,
             textAlign: TextAlign.center,
           ),
         ],
@@ -162,28 +166,25 @@ class _WinConditionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.emoji_events, size: 80, color: Colors.amber),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             'Điều kiện thắng',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.headlineMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(
             'Người đầu tiên tạo được 5 quân liên tiếp theo hàng ngang, '
             'hàng dọc hoặc đường chéo sẽ chiến thắng!',
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: AppTextStyles.bodyLarge,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpacing.xl),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (i) {
@@ -196,14 +197,8 @@ class _WinConditionPage extends StatelessWidget {
                     height: 40,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: const BoxDecoration(
-                      color: Colors.blue,
+                      color: AppColors.stoneBlack,
                       shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Text('X',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -224,33 +219,32 @@ class _GetStartedPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.rocket_launch, size: 80, color: Colors.green),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             'Bắt đầu thôi!',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.headlineMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Text(
             'Bạn đã sẵn sàng chinh phục bàn cờ! Hãy tạo phòng hoặc thách đấu AI ngay.',
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: AppTextStyles.bodyLarge,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: AppSpacing.xl + AppSpacing.md),
           ElevatedButton.icon(
             onPressed: onPressed,
             icon: const Icon(Icons.check),
             label: const Text('Đã hiểu!'),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl + AppSpacing.md,
+                  vertical: AppSpacing.md),
             ),
           ),
         ],

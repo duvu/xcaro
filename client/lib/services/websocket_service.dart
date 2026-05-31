@@ -12,9 +12,12 @@ class WebSocketService {
   bool _isConnected = false;
   String? _accessToken;
   String? _currentRoomId;
+  String? _currentRoomCode;
+  String _currentGameType = AppConfig.defaultGameType;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 6;
   bool _disposed = false;
+  bool _manualDisconnect = false;
 
   Stream<Map<String, dynamic>> get onMessage => _messageController.stream;
   Stream<bool> get isConnectedStream => _connectedController.stream;
@@ -24,11 +27,31 @@ class WebSocketService {
     _accessToken = token;
   }
 
+  void setCurrentRoom({String? roomId, String? roomCode}) {
+    if (roomId != null && roomId.isNotEmpty) {
+      _currentRoomId = roomId;
+    }
+    if (roomCode != null && roomCode.isNotEmpty) {
+      _currentRoomCode = roomCode;
+    }
+  }
+
+  void clearCurrentRoom() {
+    _currentRoomId = null;
+    _currentRoomCode = null;
+  }
+
+  void setCurrentGameType(String gameType) {
+    if (gameType.isEmpty) return;
+    _currentGameType = gameType;
+  }
+
   void connect() {
     if (_channel != null) return;
     if (_accessToken == null) return;
 
     try {
+      _manualDisconnect = false;
       final uri = Uri.parse('${AppConfig.wsUrl}?token=$_accessToken');
       _channel = WebSocketChannel.connect(uri);
       _isConnected = true;
@@ -38,8 +61,11 @@ class WebSocketService {
       _channel!.stream.listen(
         (message) {
           if (message is String) {
-            final data = jsonDecode(message) as Map<String, dynamic>;
-            _messageController.add(data);
+            final decoded = jsonDecode(message);
+            if (decoded is Map<String, dynamic>) {
+              _syncRoomFromMessage(decoded);
+              _messageController.add(decoded);
+            }
           }
         },
         onError: (error) {
@@ -62,6 +88,8 @@ class WebSocketService {
 
   void _scheduleReconnect() {
     if (_disposed) return;
+    if (_manualDisconnect) return;
+    if (_accessToken == null) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) return;
     _reconnectTimer?.cancel();
 
@@ -73,88 +101,144 @@ class WebSocketService {
       _channel = null;
       connect();
 
-      // After reconnect: re-authenticate and re-join room if needed
-      if (_isConnected && _accessToken != null) {
-        _sendAuth();
-        if (_currentRoomId != null) {
-          rejoinRoom(_currentRoomId!);
-        }
+      if (_isConnected) {
+        rejoinCurrentRoom();
       }
     });
   }
 
-  void _sendAuth() {
-    if (!_isConnected || _accessToken == null) return;
-    _channel?.sink.add(jsonEncode({
-      'type': 'auth',
-      'payload': {'token': _accessToken},
-    }));
-  }
-
   void disconnect() {
+    _manualDisconnect = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _channel?.sink.close();
     _channel = null;
     _isConnected = false;
+    _connectedController.add(false);
   }
 
-  void joinRoom(String gameId) {
-    _currentRoomId = gameId;
+  void _send(String type, Map<String, dynamic> payload) {
     if (!_isConnected) return;
     _channel?.sink.add(jsonEncode({
-      'type': AppConfig.joinRoomEvent,
-      'payload': {'gameId': gameId},
+      'type': type,
+      'payload': payload,
     }));
   }
 
-  void rejoinRoom(String gameId) {
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': 'rejoin_room',
-      'payload': {'gameId': gameId},
-    }));
+  void _syncRoomFromMessage(Map<String, dynamic> message) {
+    final type = message['type'] as String?;
+    final payload = message['payload'];
+    if (payload is! Map<String, dynamic>) return;
+
+    if (type == AppConfig.gameStateEvent ||
+        type == AppConfig.gameOverEvent ||
+        type == AppConfig.quickMatchFoundEvent) {
+      _syncRoomFromPayload(payload);
+
+      final gameState = payload['game_state'];
+      if (gameState is Map<String, dynamic>) {
+        _syncRoomFromPayload(gameState);
+      }
+    }
   }
 
-  void leaveRoom(String gameId) {
-    _currentRoomId = null;
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': AppConfig.leaveRoomEvent,
-      'payload': {'gameId': gameId},
-    }));
+  void _syncRoomFromPayload(Map<String, dynamic> payload) {
+    final roomId = payload['room_id'];
+    if (roomId is String && roomId.isNotEmpty) {
+      _currentRoomId = roomId;
+    }
+
+    final roomCode = payload['room_code'] ?? payload['code'];
+    if (roomCode is String && roomCode.isNotEmpty) {
+      _currentRoomCode = roomCode;
+    }
+
+    final gameType = payload['game_type'];
+    if (gameType is String && gameType.isNotEmpty) {
+      _currentGameType = gameType;
+    }
   }
 
-  void makeMove(int x, int y) {
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': 'make_move',
-      'payload': {'x': x, 'y': y},
-    }));
+  void joinRoom(String code) {
+    sendJoinRoom(code);
   }
 
-  void createRoom() {
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': 'create_room',
-      'payload': {},
-    }));
+  void rejoinRoom(String roomId, {String? gameType}) {
+    setCurrentRoom(roomId: roomId);
+    _send(AppConfig.rejoinRoomEvent,
+        {'room_id': roomId, 'game_type': gameType ?? _currentGameType});
   }
 
-  void sendJoinRoom(String code) {
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': 'join_room_by_code',
-      'payload': {'code': code},
-    }));
+  void rejoinCurrentRoom() {
+    if (_currentRoomId != null) {
+      _send(AppConfig.rejoinRoomEvent,
+          {'room_id': _currentRoomId, 'game_type': _currentGameType});
+      return;
+    }
+
+    if (_currentRoomCode != null) {
+      _send(AppConfig.rejoinRoomEvent,
+          {'code': _currentRoomCode, 'game_type': _currentGameType});
+    }
   }
 
-  void sendChatMessage(String gameId, String content) {
-    if (!_isConnected) return;
-    _channel?.sink.add(jsonEncode({
-      'type': AppConfig.chatEvent,
-      'payload': {'gameId': gameId, 'content': content},
-    }));
+  void leaveRoom([String? roomId, String? gameType]) {
+    final payload = <String, dynamic>{};
+    final targetRoomId = roomId ?? _currentRoomId;
+    if (targetRoomId != null) {
+      payload['room_id'] = targetRoomId;
+    }
+    payload['game_type'] = gameType ?? _currentGameType;
+    _send(AppConfig.leaveRoomEvent, payload);
+    clearCurrentRoom();
+  }
+
+  void makeMove(int x, int y, {String? gameType}) {
+    _send(AppConfig.moveEvent,
+        {'x': x, 'y': y, 'game_type': gameType ?? _currentGameType});
+  }
+
+  void makeChessMove(String from, String to,
+      {String? promotion, String? gameType}) {
+    final payload = <String, dynamic>{
+      'from': from,
+      'to': to,
+      'game_type': gameType ?? _currentGameType,
+    };
+    if (promotion != null) payload['promotion'] = promotion;
+    _send(AppConfig.moveEvent, payload);
+  }
+
+  void createRoom({String? gameType}) {
+    final selectedGameType = gameType ?? _currentGameType;
+    setCurrentGameType(selectedGameType);
+    _send(AppConfig.createRoomEvent, {'game_type': selectedGameType});
+  }
+
+  void sendJoinRoom(String code, {String? gameType}) {
+    final selectedGameType = gameType ?? _currentGameType;
+    setCurrentRoom(roomCode: code);
+    setCurrentGameType(selectedGameType);
+    _send(AppConfig.joinRoomByCodeEvent,
+        {'code': code, 'game_type': selectedGameType});
+  }
+
+  void requestQuickMatch({String? gameType}) {
+    final selectedGameType = gameType ?? _currentGameType;
+    setCurrentGameType(selectedGameType);
+    _send(AppConfig.quickMatchRequestEvent, {'game_type': selectedGameType});
+  }
+
+  void cancelQuickMatch() {
+    _send(AppConfig.quickMatchCancelEvent, {});
+  }
+
+  void resign() {
+    _send(AppConfig.resignEvent, {'game_type': _currentGameType});
+  }
+
+  void sendChatMessage(String content) {
+    _send(AppConfig.chatEvent, {'content': content});
   }
 
   void send(Map<String, dynamic> message) {

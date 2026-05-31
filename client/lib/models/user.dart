@@ -5,6 +5,7 @@ class User extends Equatable {
   final String username;
   final String email;
   final String role;
+  final bool emailVerified;
   final bool isBanned;
   final String? banReason;
   final String? fullName;
@@ -23,6 +24,7 @@ class User extends Equatable {
     required this.username,
     required this.email,
     required this.role,
+    required this.emailVerified,
     required this.isBanned,
     this.banReason,
     this.fullName,
@@ -38,18 +40,24 @@ class User extends Equatable {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final rawDateOfBirth = json['date_of_birth'] as String?;
+    final parsedDateOfBirth = rawDateOfBirth != null &&
+            rawDateOfBirth.isNotEmpty &&
+            !rawDateOfBirth.startsWith('0001-01-01')
+        ? DateTime.tryParse(rawDateOfBirth)
+        : null;
+
     return User(
       id: json['id'],
       username: json['username'],
       email: json['email'],
       role: json['role'],
+      emailVerified: json['email_verified'] == true,
       isBanned: json['is_banned'] ?? false,
       banReason: json['ban_reason'],
       fullName: json['full_name'],
       avatar: json['avatar'],
-      dateOfBirth: json['date_of_birth'] != null
-          ? DateTime.parse(json['date_of_birth'])
-          : null,
+      dateOfBirth: parsedDateOfBirth,
       phoneNumber: json['phone_number'],
       bio: json['bio'],
       gamesPlayed: json['games_played'] ?? 0,
@@ -66,6 +74,7 @@ class User extends Equatable {
       'username': username,
       'email': email,
       'role': role,
+      'email_verified': emailVerified,
       'is_banned': isBanned,
       'ban_reason': banReason,
       'full_name': fullName,
@@ -87,6 +96,7 @@ class User extends Equatable {
         username,
         email,
         role,
+        emailVerified,
         isBanned,
         banReason,
         fullName,
@@ -106,6 +116,7 @@ class User extends Equatable {
     String? username,
     String? email,
     String? role,
+    bool? emailVerified,
     bool? isBanned,
     String? banReason,
     String? fullName,
@@ -124,6 +135,7 @@ class User extends Equatable {
       username: username ?? this.username,
       email: email ?? this.email,
       role: role ?? this.role,
+      emailVerified: emailVerified ?? this.emailVerified,
       isBanned: isBanned ?? this.isBanned,
       banReason: banReason ?? this.banReason,
       fullName: fullName ?? this.fullName,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
 
@@ -23,12 +24,16 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
     final ws = context.read<WebSocketService>();
     _wsSub = ws.onMessage.listen((msg) {
       final type = msg['type'] as String?;
-      if (type == 'game_state') {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/online_game');
-        }
-      } else if (type == 'error') {
-        final code = msg['payload']?['code'] as String?;
+      final payload = msg['payload'] is Map<String, dynamic>
+          ? msg['payload'] as Map<String, dynamic>
+          : null;
+
+      if (type == AppConfig.gameStateEvent) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/online_game');
+      } else if (type == AppConfig.errorEvent && payload != null) {
+        if (!mounted) return;
+        final code = payload['code'] as String?;
         if (code == 'email_not_verified') {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -45,8 +50,7 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
           }
         } else {
           setState(() {
-            _error = msg['payload']?['message'] as String? ??
-                'Mã phòng không hợp lệ';
+            _error = _errorMessage(code, payload['message'] as String?);
             _loading = false;
           });
         }
@@ -72,14 +76,30 @@ class _JoinRoomScreenState extends State<JoinRoomScreen> {
       _error = null;
     });
     try {
-      final api = context.read<ApiService>();
-      await api.joinRoom(code);
-      // Wait for WS game_state to navigate
+      final ws = context.read<WebSocketService>();
+      if (!ws.isConnected) {
+        throw Exception('Đang kết nối lại máy chủ, vui lòng thử lại.');
+      }
+      ws.sendJoinRoom(code);
+      // Wait for WS game_state to navigate.
     } catch (e) {
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  String _errorMessage(String? code, String? fallback) {
+    switch (code) {
+      case 'room_not_found':
+        return 'Không tìm thấy phòng';
+      case 'room_full':
+        return 'Phòng đã đủ người';
+      case 'already_queued':
+        return 'Bạn đang trong hàng đợi tìm đối thủ';
+      default:
+        return fallback ?? 'Mã phòng không hợp lệ';
     }
   }
 

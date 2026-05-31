@@ -2,6 +2,7 @@ import 'user.dart';
 
 class Game {
   final String id;
+  final String gameType;
   final List<User> players;
   final User currentPlayer;
   final List<List<String>> board;
@@ -12,6 +13,7 @@ class Game {
 
   Game({
     required this.id,
+    required this.gameType,
     required this.players,
     required this.currentPlayer,
     required this.board,
@@ -24,6 +26,7 @@ class Game {
   factory Game.fromJson(Map<String, dynamic> json) {
     return Game(
       id: json['id'] as String,
+      gameType: json['game_type'] as String? ?? 'caro',
       players: (json['players'] as List<dynamic>)
           .map((player) => User.fromJson(player as Map<String, dynamic>))
           .toList(),
@@ -45,6 +48,7 @@ class Game {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'game_type': gameType,
       'players': players.map((player) => player.toJson()).toList(),
       'currentPlayer': currentPlayer.toJson(),
       'board': board,

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/game_catalog_provider.dart';
 import '../services/api_service.dart';
-import '../providers/auth_provider.dart';
-import '../models/game.dart';
+import '../models/dashboard_models.dart';
 import '../models/game_stats.dart';
+import '../widgets/empty_state_widget.dart';
+import '../widgets/player_stats_card.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final bool showAsTab;
+
+  const HistoryScreen({super.key, this.showAsTab = false});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -14,11 +20,14 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   final ScrollController _scrollController = ScrollController();
-  final List<Game> _games = [];
+  final List<DashboardGameRecord> _games = [];
   int _page = 1;
   bool _loading = false;
   bool _hasMore = true;
   GameStats? _stats;
+  String? _resultFilter;
+  String? _error;
+  String? _loadedGameType;
 
   @override
   void initState() {
@@ -31,6 +40,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selectedGameType =
+        Provider.of<GameCatalogProvider>(context).selectedGameType;
+    if (_loadedGameType != selectedGameType) {
+      _loadedGameType = selectedGameType;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadInitial();
+      });
+    }
   }
 
   void _onScroll() {
@@ -46,21 +68,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiService>();
-      final auth = context.read<AuthProvider>();
-      final userId = auth.currentUser?.id;
-      if (userId != null) {
-        final stats = await api.getGameStats(userId);
-        setState(() => _stats = stats);
-      }
-      final games = await api.getGames(page: 1, limit: 20, userId: userId);
+      final gameType = context.read<GameCatalogProvider>().selectedGameType;
+      final summary = await api.getDashboardSummary(gameType: gameType);
+      final history = await api.getDashboardHistory(
+        page: 1,
+        limit: 20,
+        gameType: gameType,
+        result: _resultFilter,
+      );
       setState(() {
+        _error = null;
+        _games.clear();
+        _stats = GameStats(
+          wins: summary.stats.wins,
+          losses: summary.stats.losses,
+          draws: summary.stats.draws,
+          eloRating: summary.stats.eloRating,
+          rank: summary.stats.rank,
+        );
+        final games = history.games;
         _games.addAll(games);
         _page = 2;
-        _hasMore = games.length == 20;
+        _hasMore = history.hasMore;
       });
-    } catch (_) {
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -68,121 +102,231 @@ class _HistoryScreenState extends State<HistoryScreen> {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiService>();
-      final auth = context.read<AuthProvider>();
-      final userId = auth.currentUser?.id;
-      final games = await api.getGames(page: _page, limit: 20, userId: userId);
+      final gameType = context.read<GameCatalogProvider>().selectedGameType;
+      final history = await api.getDashboardHistory(
+        page: _page,
+        limit: 20,
+        gameType: gameType,
+        result: _resultFilter,
+      );
       setState(() {
-        _games.addAll(games);
+        _error = null;
+        _games.addAll(history.games);
         _page++;
-        _hasMore = games.length == 20;
+        _hasMore = history.hasMore;
       });
-    } catch (_) {
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _setFilter(String? value) {
+    setState(() {
+      _resultFilter = value;
+      _page = 1;
+      _hasMore = true;
+      _games.clear();
+    });
+    _loadInitial();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Lịch sử trận đấu')),
-      body: Column(
-        children: [
-          if (_stats != null)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _StatChip(
-                      label: 'Thắng', value: _stats!.wins, color: Colors.green),
-                  _StatChip(
-                      label: 'Thua', value: _stats!.losses, color: Colors.red),
-                  _StatChip(
-                      label: 'Hòa', value: _stats!.draws, color: Colors.orange),
-                ],
-              ),
+    Widget body = Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Game: ${context.watch<GameCatalogProvider>().selectedGame?.name ?? 'PlayVerse'}',
+              style: AppTextStyles.labelLarge,
             ),
-          Expanded(
-            child: _games.isEmpty && !_loading
-                ? const Center(child: Text('Chưa có trận đấu nào'))
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: _games.length + (_loading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _games.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-                      final game = _games[index];
-                      final auth = context.read<AuthProvider>();
-                      final myId = auth.currentUser?.id;
-                      final isWinner = game.winner?.id == myId;
-                      final isDraw =
-                          game.status == 'finished' && game.winner == null;
-                      String result = 'Đang diễn ra';
-                      Color resultColor = Colors.blue;
-                      if (game.status == 'finished') {
-                        if (isDraw) {
-                          result = 'Hòa';
-                          resultColor = Colors.orange;
-                        } else if (isWinner) {
-                          result = 'Thắng';
-                          resultColor = Colors.green;
-                        } else {
-                          result = 'Thua';
-                          resultColor = Colors.red;
-                        }
-                      }
-                      final opponentName = game.players
-                              .where((p) => p.id != myId)
-                              .map((p) => p.username)
-                              .firstOrNull ??
-                          'Đối thủ';
-                      return ListTile(
-                        leading: Icon(Icons.sports_esports, color: resultColor),
-                        title: Text('vs $opponentName'),
-                        subtitle: Text(
-                            '${game.createdAt.day}/${game.createdAt.month}/${game.createdAt.year}'),
-                        trailing: Text(
-                          result,
-                          style: TextStyle(
-                              color: resultColor, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Stats card
+        if (_stats != null)
+          PlayerStatsCard(
+            stats: _stats!,
+            username: 'Bạn',
+          )
+        else
+          const SizedBox.shrink(),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Wrap(
+            spacing: AppSpacing.sm,
+            children: [
+              _FilterChip(
+                label: 'Tất cả',
+                selected: _resultFilter == null,
+                onSelected: () => _setFilter(null),
+              ),
+              _FilterChip(
+                label: 'Thắng',
+                selected: _resultFilter == 'win',
+                onSelected: () => _setFilter('win'),
+              ),
+              _FilterChip(
+                label: 'Thua',
+                selected: _resultFilter == 'loss',
+                onSelected: () => _setFilter('loss'),
+              ),
+              _FilterChip(
+                label: 'Hòa',
+                selected: _resultFilter == 'draw',
+                onSelected: () => _setFilter('draw'),
+              ),
+            ],
+          ),
+        ),
+
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+
+        // Games list
+        Expanded(
+          child: _games.isEmpty && !_loading
+              ? EmptyStateWidget(
+                  icon: Icons.history,
+                  title: 'Chưa có trận đấu nào',
+                  subtitle: 'Tham gia một trận để bắt đầu hành trình của bạn!',
+                  actionLabel: 'Tạo phòng',
+                  onAction: () => Navigator.pushNamed(context, '/create_room'),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _games.length + (_loading ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _games.length) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(),
                         ),
                       );
-                    },
-                  ),
+                    }
+                    final game = _games[index];
+                    String result = 'Thua';
+                    Color resultColor = Colors.blue;
+                    IconData resultIcon = Icons.sports_esports;
+
+                    if (game.outcome == 'draw') {
+                      result = 'Hòa';
+                      resultColor = Colors.orange;
+                      resultIcon = Icons.handshake;
+                    } else if (game.outcome == 'win') {
+                      result = 'Thắng';
+                      resultColor = Colors.green;
+                      resultIcon = Icons.emoji_events;
+                    } else {
+                      resultColor = Colors.red;
+                      resultIcon = Icons.close;
+                    }
+
+                    return _HistoryCard(
+                      opponent: game.opponent ?? 'Đối thủ',
+                      result: result,
+                      resultColor: resultColor,
+                      resultIcon: resultIcon,
+                      date:
+                          '${game.createdAt.day}/${game.createdAt.month}/${game.createdAt.year}',
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+
+    if (widget.showAsTab) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+            child:
+                Text('Lịch sử trận đấu', style: AppTextStyles.headlineMedium),
           ),
+          Expanded(child: body),
         ],
-      ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Lịch sử trận đấu')),
+      body: body,
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
-  final int value;
-  final Color color;
+  final bool selected;
+  final VoidCallback onSelected;
 
-  const _StatChip(
-      {required this.label, required this.value, required this.color});
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          '$value',
-          style: TextStyle(
-              fontSize: 24, fontWeight: FontWeight.bold, color: color),
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  final String opponent;
+  final String result;
+  final Color resultColor;
+  final IconData resultIcon;
+  final String date;
+
+  const _HistoryCard({
+    required this.opponent,
+    required this.result,
+    required this.resultColor,
+    required this.resultIcon,
+    required this.date,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: resultColor.withValues(alpha: 0.15),
+          child: Icon(resultIcon, color: resultColor, size: 20),
         ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+        title: Text('vs $opponent', style: AppTextStyles.bodyLarge),
+        subtitle: Text(date,
+            style:
+                AppTextStyles.bodyMedium.copyWith(color: Colors.grey.shade600)),
+        trailing: Chip(
+          label: Text(
+            result,
+            style: AppTextStyles.labelSmall
+                .copyWith(color: resultColor, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: resultColor.withValues(alpha: 0.1),
+          side: BorderSide(color: resultColor.withValues(alpha: 0.3)),
+        ),
+      ),
     );
   }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/offline_ai_provider.dart';
 import '../ai/ai_engine.dart';
+import '../widgets/game_board.dart';
+import '../models/user.dart';
+import '../widgets/player_hud.dart';
 
 class AiGameScreen extends StatelessWidget {
   const AiGameScreen({super.key});
@@ -111,64 +114,63 @@ class _AiGameViewState extends State<_AiGameView> {
             AiDifficulty.hard => 'Khó',
           };
 
-          final turnText = provider.aiThinking
-              ? 'Máy đang suy nghĩ...'
-              : provider.currentTurn == 1
-                  ? 'Lượt của bạn (X)'
-                  : 'Lượt của máy (O)';
+          // Build pseudo User objects for PlayerHud
+          final playerUser = User.fromJson(const {
+            'id': '1',
+            'username': 'Bạn',
+            'email': '',
+            'role': 'user',
+            'is_banned': false,
+            'games_played': 0,
+            'games_won': 0,
+            'rating': 1000,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'updated_at': '2024-01-01T00:00:00.000Z',
+          });
+          final aiUser = User.fromJson({
+            'id': '2',
+            'username': 'AI ($diffLabel)',
+            'email': '',
+            'role': 'user',
+            'is_banned': false,
+            'games_played': 0,
+            'games_won': 0,
+            'rating': 1000,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'updated_at': '2024-01-01T00:00:00.000Z',
+          });
+          final currentTurnId =
+              provider.currentTurn == 1 ? '1' : '2';
 
-          final cellSize =
-              ((MediaQuery.of(context).size.width - 32) / 15).clamp(20.0, 40.0);
+          // Convert int board to String board for GameBoard
+          final stringBoard = provider.board
+              .map((row) => row
+                  .map((v) => v == 1
+                      ? 'X'
+                      : v == 2
+                          ? 'O'
+                          : '')
+                  .toList())
+              .toList();
 
           return Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                color: provider.currentTurn == 1
-                    ? Colors.blue.withValues(alpha: 0.1)
-                    : Colors.red.withValues(alpha: 0.1),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (provider.aiThinking)
-                      const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2)),
-                    if (provider.aiThinking) const SizedBox(width: 8),
-                    Text(turnText,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    Chip(label: Text(diffLabel)),
-                  ],
-                ),
+              // PlayerHud with pulsing-glow on active player
+              PlayerHud(
+                playerX: playerUser,
+                playerO: aiUser,
+                currentTurnId: provider.aiThinking ? null : currentTurnId,
+                myId: '1',
               ),
+              // AI thinking indicator
+              if (provider.aiThinking)
+                const LinearProgressIndicator(),
               Expanded(
-                child: Center(
-                  child: SizedBox(
-                    width: cellSize * 15,
-                    height: cellSize * 15,
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 15,
-                      ),
-                      itemCount: 225,
-                      itemBuilder: (context, index) {
-                        final x = index ~/ 15;
-                        final y = index % 15;
-                        final val = provider.board[x][y];
-                        return _AiCell(
-                          value: val,
-                          onTap: provider.gameOver || provider.aiThinking
-                              ? null
-                              : () => provider.makeMove(x, y),
-                        );
-                      },
-                    ),
-                  ),
+                child: GameBoard(
+                  board: stringBoard,
+                  onTap: (x, y) => provider.makeMove(x, y),
+                  canTap: (x, y) =>
+                      !provider.gameOver && !provider.aiThinking,
                 ),
               ),
             ],
@@ -242,80 +244,6 @@ class _DifficultySheetState extends State<_DifficultySheet> {
           ),
           const SizedBox(height: 8),
         ],
-      ),
-    );
-  }
-}
-
-class _AiCell extends StatefulWidget {
-  final int value;
-  final VoidCallback? onTap;
-
-  const _AiCell({required this.value, this.onTap});
-
-  @override
-  State<_AiCell> createState() => _AiCellState();
-}
-
-class _AiCellState extends State<_AiCell> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scale;
-  int _prevValue = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _scale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    if (widget.value != 0) _controller.value = 1.0;
-  }
-
-  @override
-  void didUpdateWidget(_AiCell old) {
-    super.didUpdateWidget(old);
-    if (widget.value != 0 && _prevValue == 0) {
-      _controller.forward(from: 0.0);
-    }
-    _prevValue = widget.value;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = widget.value == 1 ? Colors.blue : Colors.red;
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300, width: 0.5),
-          color: Colors.amber.shade50,
-        ),
-        child: widget.value == 0
-            ? null
-            : Center(
-                child: ScaleTransition(
-                  scale: _scale,
-                  child: Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    margin: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ),
       ),
     );
   }

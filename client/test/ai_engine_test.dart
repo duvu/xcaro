@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xcaro/ai/ai_engine.dart';
+import 'package:playverse/ai/ai_engine.dart';
 
 void main() {
   group('AiEngine difficulty', () {

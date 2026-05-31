@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'theme/app_theme.dart';
+import 'screens/main_scaffold.dart';
 import 'screens/quick_match_waiting_screen.dart';
 import 'services/api_service.dart';
 import 'services/websocket_service.dart';
@@ -14,6 +16,8 @@ import 'providers/offline_game_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/leaderboard_provider.dart';
 import 'providers/chat_provider.dart';
+import 'providers/game_catalog_provider.dart';
+import 'providers/social_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
@@ -26,6 +30,11 @@ import 'screens/history_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/opponent_profile_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/friends_screen.dart';
+import 'screens/chess_game_screen.dart';
+import 'screens/chess_join_screen.dart';
+import 'screens/chess_ai_game_screen.dart';
+import 'screens/account_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,7 +88,13 @@ void main() async {
             ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
             ChangeNotifierProvider<ChatProvider>.value(value: chatProvider),
             ChangeNotifierProvider(
-              create: (_) => AuthProvider(apiService),
+              create: (_) => GameCatalogProvider(apiService),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => SocialProvider(apiService),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => AuthProvider(apiService, wsService),
             ),
             ChangeNotifierProvider(
               create: (_) => GameProvider(apiService, wsService, chatProvider),
@@ -115,22 +130,16 @@ class MyApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
-      title: 'XCaro',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple, brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
+      title: 'PlayVerse',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: themeProvider.themeMode,
       home: const _AppRoot(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const MainScaffold(),
+        '/main': (context) => const MainScaffold(),
         '/game': (context) => const GameScreen(),
         '/online_game': (context) => const GameScreen(),
         '/create_room': (context) => const CreateRoomScreen(),
@@ -142,6 +151,11 @@ class MyApp extends StatelessWidget {
         '/opponent_profile': (context) => const OpponentProfileScreen(),
         '/onboarding': (context) => const OnboardingScreen(forceShow: true),
         '/quick_match': (context) => const QuickMatchWaitingScreen(),
+        '/friends': (context) => const FriendsScreen(),
+        '/account': (context) => const AccountSettingsScreen(),
+        '/chess_online': (context) => const ChessGameScreen(),
+        '/chess_join': (context) => const ChessJoinScreen(),
+        '/chess_ai': (context) => const ChessAiGameScreen(),
       },
     );
   }
@@ -163,7 +177,7 @@ class _AppRoot extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'XCaro',
+                    'PlayVerse',
                     style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,

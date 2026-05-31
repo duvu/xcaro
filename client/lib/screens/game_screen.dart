@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/websocket_service.dart';
 import '../widgets/game_board.dart';
+import '../widgets/player_hud.dart';
 
 class GameScreen extends StatelessWidget {
   const GameScreen({super.key});
@@ -19,7 +20,7 @@ class GameScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('XCaro'),
+        title: const Text('PlayVerse'),
         actions: [
           if (!isAuthenticated)
             TextButton(
@@ -31,7 +32,9 @@ class GameScreen extends StatelessWidget {
             if (isAuthenticated)
               Consumer<GameProvider>(
                 builder: (context, gp, _) {
-                  if (gp.currentGame == null) return const SizedBox.shrink();
+                  if (gp.currentGame == null && !gp.hasOnlineRoom) {
+                    return const SizedBox.shrink();
+                  }
                   return PopupMenuButton<String>(
                     onSelected: (_) => _showReportDialog(context, gp),
                     itemBuilder: (_) => const [
@@ -67,7 +70,7 @@ class GameScreen extends StatelessWidget {
     final opponentId = gp.playerX?.id == myId ? gp.playerO?.id : gp.playerX?.id;
     if (opponentId == null) return;
 
-    final gameId = gp.currentGame?.id ?? '';
+    final gameId = gp.currentGame?.id ?? gp.roomId ?? '';
     final reasonController = TextEditingController();
 
     showDialog(
@@ -201,7 +204,8 @@ class _OnlineGameViewState extends State<OnlineGameView> {
     String message;
     if (result == 'resign') {
       // who resigned?
-      message = winner == myId ? 'Đối thủ đã đầu hàng! 🏳️' : 'Bạn đã đầu hàng! 🏳️';
+      message =
+          winner == myId ? 'Đối thủ đã đầu hàng! 🏳️' : 'Bạn đã đầu hàng! 🏳️';
     } else if (result == 'forfeit' || winner == 'disconnect') {
       message = 'Đối thủ đã ngắt kết nối! 🚫';
     } else if (result == 'draw' || winner == 'draw' || winner == null) {
@@ -242,6 +246,45 @@ class _OnlineGameViewState extends State<OnlineGameView> {
     });
   }
 
+  void _showGameMenu(BuildContext context, GameProvider gameProvider) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Chat'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _chatOpen = !_chatOpen);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text('Đầu hàng'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<WebSocketService>().resign();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app),
+              title: const Text('Thoát'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<WebSocketService>().leaveRoom(gameProvider.roomId);
+                gameProvider.clearCurrentGame();
+                Navigator.pushReplacementNamed(context, '/home');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<GameProvider>(
@@ -256,8 +299,7 @@ class _OnlineGameViewState extends State<OnlineGameView> {
           _dialogShown = false;
         }
 
-        final game = gameProvider.currentGame;
-        if (game == null) {
+        if (!gameProvider.hasOnlineRoom) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -296,52 +338,75 @@ class _OnlineGameViewState extends State<OnlineGameView> {
                 .toList())
             .toList();
 
-        return Column(
-          children: [
-            _TurnIndicator(
-              label: isMyTurn ? 'Lượt của bạn' : 'Lượt của đối thủ',
-              isMyTurn: isMyTurn,
-            ),
-            Expanded(
-              child: GameBoard(
-                board: stringBoard,
-                onTap: (x, y) => gameProvider.makeMove(x, y),
-                canTap: (x, y) => isMyTurn && !gameProvider.gameOver,
-              ),
-            ),
-            // Chat panel
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              height: _chatOpen ? 250 : 0,
-              child: ClipRect(
-                child: _chatOpen
-                    ? _ChatPanel(
-                        onClose: () => setState(() => _chatOpen = false),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    tooltip: 'Chat',
-                    onPressed: () => setState(() => _chatOpen = !_chatOpen),
+        return Scaffold(
+          body: Column(
+            children: [
+              if (!gameProvider.started && !gameProvider.gameOver)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  color: Colors.amber.withValues(alpha: 0.18),
+                  child: Text(
+                    gameProvider.roomCode == null
+                        ? 'Đang chờ đối thủ...'
+                        : 'Mã phòng: ${gameProvider.roomCode} • Đang chờ đối thủ...',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      gameProvider.clearCurrentGame();
-                      Navigator.pushReplacementNamed(context, '/home');
-                    },
-                    child: const Text('Thoát'),
-                  ),
-                ],
+                ),
+              // Player HUD replaces old _TurnIndicator
+              PlayerHud(
+                playerX: gameProvider.playerX,
+                playerO: gameProvider.playerO,
+                currentTurnId: gameProvider.currentTurn,
+                myId: auth.currentUser?.id,
               ),
-            ),
-          ],
+              Expanded(
+                child: GameBoard(
+                  board: stringBoard,
+                  onTap: (x, y) => gameProvider.makeMove(x, y),
+                  canTap: (x, y) =>
+                      isMyTurn &&
+                      gameProvider.started &&
+                      !gameProvider.gameOver &&
+                      stringBoard[x][y].isEmpty,
+                  winningCells: gameProvider.winningCells,
+                ),
+              ),
+              // Chat panel
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: _chatOpen ? 250 : 0,
+                child: ClipRect(
+                  child: _chatOpen
+                      ? _ChatPanel(
+                          onClose: () => setState(() => _chatOpen = false),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+              // Bottom action row — chat + FAB menu
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      tooltip: 'Chat',
+                      onPressed: () => setState(() => _chatOpen = !_chatOpen),
+                    ),
+                    FloatingActionButton.small(
+                      heroTag: 'game_fab',
+                      onPressed: () => _showGameMenu(context, gameProvider),
+                      child: const Icon(Icons.more_vert),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -369,10 +434,7 @@ class _ChatPanelState extends State<_ChatPanel> {
   void _send() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-    context.read<WebSocketService>().send({
-      'type': 'chat_message',
-      'payload': {'content': text},
-    });
+    context.read<WebSocketService>().sendChatMessage(text);
     _textController.clear();
   }
 
@@ -405,8 +467,7 @@ class _ChatPanelState extends State<_ChatPanel> {
                   size: 18,
                 ),
                 tooltip: isMuted ? 'Bật âm chat' : 'Tắt tiếng chat',
-                onPressed: () =>
-                    context.read<GameProvider>().toggleChatMute(),
+                onPressed: () => context.read<GameProvider>().toggleChatMute(),
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 18),

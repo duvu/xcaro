@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
 
@@ -24,31 +25,43 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
     final ws = context.read<WebSocketService>();
     _wsSub = ws.onMessage.listen((msg) {
       final type = msg['type'] as String?;
-      if (type == 'room_created') {
+      final payload = msg['payload'] is Map<String, dynamic>
+          ? msg['payload'] as Map<String, dynamic>
+          : null;
+
+      if (type == AppConfig.gameStateEvent && payload != null) {
+        final roomCode = payload['room_code'] as String? ??
+            payload['code'] as String? ??
+            _roomCode;
+        final started = payload['started'] == true ||
+            payload['status'] == 'active' ||
+            payload['status'] == 'finished';
+        if (!mounted) return;
         setState(() {
-          _roomCode = msg['payload']?['code'] as String?;
+          _roomCode = roomCode;
           _loading = false;
         });
-      } else if (type == 'game_state') {
-        // Opponent joined, navigate to game
-        if (mounted) {
+        if (started) {
           Navigator.pushReplacementNamed(context, '/online_game');
         }
-      } else if (type == 'error') {
-        final code = msg['payload']?['code'] as String?;
+      } else if (type == AppConfig.errorEvent && payload != null) {
+        final code = payload['code'] as String?;
+        if (!mounted) return;
+        setState(() {
+          _error = payload['message'] as String? ?? 'Không thể tạo phòng';
+          _loading = false;
+        });
         if (code == 'email_not_verified') {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Vui lòng xác minh email để chơi online'),
-                action: SnackBarAction(
-                  label: 'Gửi lại',
-                  onPressed: () =>
-                      context.read<ApiService>().resendVerification(),
-                ),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Vui lòng xác minh email để chơi online'),
+              action: SnackBarAction(
+                label: 'Gửi lại',
+                onPressed: () =>
+                    context.read<ApiService>().resendVerification(),
               ),
-            );
-          }
+            ),
+          );
         }
       }
     });
@@ -66,12 +79,11 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       _error = null;
     });
     try {
-      final api = context.read<ApiService>();
-      final result = await api.createRoom();
-      setState(() {
-        _roomCode = result['code'] as String?;
-        _loading = false;
-      });
+      final ws = context.read<WebSocketService>();
+      if (!ws.isConnected) {
+        throw Exception('Đang kết nối lại máy chủ, vui lòng thử lại.');
+      }
+      ws.createRoom();
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -133,7 +145,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
                 // Share invite button
                 OutlinedButton.icon(
                   onPressed: () => Share.share(
-                    'Tham gia phòng XCaro của mình: $_roomCode\nxcaro://room/$_roomCode',
+                    'Tham gia phòng PlayVerse của mình: $_roomCode\nplayverse://room/$_roomCode',
                   ),
                   icon: const Icon(Icons.share),
                   label: const Text('Chia sẻ mã phòng'),

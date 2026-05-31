@@ -47,6 +47,7 @@ class OfflineGameProvider extends ChangeNotifier {
           username: 'Người chơi',
           email: 'offline@example.com',
           role: 'player',
+          emailVerified: true,
           isBanned: false,
           gamesPlayed: 0,
           gamesWon: 0,
@@ -61,6 +62,7 @@ class OfflineGameProvider extends ChangeNotifier {
         username: 'Máy tính',
         email: 'computer@example.com',
         role: 'player',
+        emailVerified: true,
         isBanned: false,
         gamesPlayed: 0,
         gamesWon: 0,
@@ -77,6 +79,7 @@ class OfflineGameProvider extends ChangeNotifier {
   Future<void> startNewGame() async {
     _currentGame = Game(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      gameType: 'caro',
       players: [_currentUser!, _computer!],
       currentPlayer: _currentUser!,
       board: List.generate(15, (_) => List.filled(15, '')),
@@ -104,6 +107,7 @@ class OfflineGameProvider extends ChangeNotifier {
 
     _currentGame = Game(
       id: _currentGame!.id,
+      gameType: _currentGame!.gameType,
       players: _currentGame!.players,
       currentPlayer: _computer!,
       board: newBoard,
@@ -117,6 +121,7 @@ class OfflineGameProvider extends ChangeNotifier {
     if (_checkWin(x, y)) {
       _currentGame = Game(
         id: _currentGame!.id,
+        gameType: _currentGame!.gameType,
         players: _currentGame!.players,
         currentPlayer: _currentGame!.currentPlayer,
         board: _currentGame!.board,
@@ -133,6 +138,7 @@ class OfflineGameProvider extends ChangeNotifier {
     if (_checkDraw()) {
       _currentGame = Game(
         id: _currentGame!.id,
+        gameType: _currentGame!.gameType,
         players: _currentGame!.players,
         currentPlayer: _currentGame!.currentPlayer,
         board: _currentGame!.board,
@@ -162,6 +168,7 @@ class OfflineGameProvider extends ChangeNotifier {
 
       _currentGame = Game(
         id: _currentGame!.id,
+        gameType: _currentGame!.gameType,
         players: _currentGame!.players,
         currentPlayer: _currentUser!,
         board: newBoard,
@@ -175,6 +182,7 @@ class OfflineGameProvider extends ChangeNotifier {
       if (_checkWin(move.x, move.y)) {
         _currentGame = Game(
           id: _currentGame!.id,
+          gameType: _currentGame!.gameType,
           players: _currentGame!.players,
           currentPlayer: _currentGame!.currentPlayer,
           board: _currentGame!.board,
@@ -191,6 +199,7 @@ class OfflineGameProvider extends ChangeNotifier {
       if (_checkDraw()) {
         _currentGame = Game(
           id: _currentGame!.id,
+          gameType: _currentGame!.gameType,
           players: _currentGame!.players,
           currentPlayer: _currentGame!.currentPlayer,
           board: _currentGame!.board,

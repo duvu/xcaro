@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../models/game_stats.dart';
+import '../widgets/player_stats_card.dart';
+import '../widgets/error_state_widget.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 class OpponentProfileScreen extends StatefulWidget {
-  const OpponentProfileScreen({super.key});
+  /// Provide [userId] to show a specific user's profile directly (tab usage).
+  final String? userId;
+
+  /// If true, hide the AppBar (used when embedded in MainScaffold tab).
+  final bool showAsTab;
+
+  const OpponentProfileScreen({
+    super.key,
+    this.userId,
+    this.showAsTab = false,
+  });
 
   @override
   State<OpponentProfileScreen> createState() => _OpponentProfileScreenState();
@@ -12,16 +29,37 @@ class OpponentProfileScreen extends StatefulWidget {
 class _OpponentProfileScreenState extends State<OpponentProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
+  bool _sendingFriendRequest = false;
   String? _error;
+  String? _friendMessage;
+  String? _resolvedUserId;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final userId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
-    _fetchProfile(userId);
+    final routeArgs = ModalRoute.of(context)?.settings.arguments as String?;
+    final id = widget.userId ?? routeArgs ?? '';
+    if (id != _resolvedUserId) {
+      _resolvedUserId = id;
+      _fetchProfile(id);
+    }
   }
 
   Future<void> _fetchProfile(String userId) async {
+    if (userId.isEmpty) {
+      // Current user own profile — try loading via AuthProvider
+      final auth = context.read<AuthProvider>();
+      final myId = auth.currentUser?.id;
+      if (myId == null || myId.isEmpty) {
+        setState(() {
+          _loading = false;
+          _profile = null;
+        });
+        return;
+      }
+      return _fetchProfile(myId);
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -36,23 +74,82 @@ class _OpponentProfileScreenState extends State<OpponentProfileScreen> {
     }
   }
 
+  Future<void> _sendFriendRequest() async {
+    final userId = _resolvedUserId;
+    if (userId == null || userId.isEmpty || widget.showAsTab) return;
+    setState(() {
+      _sendingFriendRequest = true;
+      _friendMessage = null;
+    });
+    try {
+      await context.read<ApiService>().sendFriendRequest(userId);
+      if (mounted) {
+        setState(() => _friendMessage = 'Đã gửi lời mời kết bạn');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _friendMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _sendingFriendRequest = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (_error != null) {
+      body = ErrorStateWidget(
+        message: 'Không thể tải hồ sơ\n$_error',
+        onRetry: () => _fetchProfile(_resolvedUserId ?? ''),
+      );
+    } else if (_profile == null) {
+      body = const Center(child: Text('Không tìm thấy hồ sơ'));
+    } else {
+      body = _ProfileBody(
+        profile: _profile!,
+        isOwnProfile: widget.showAsTab,
+        friendMessage: _friendMessage,
+        sendingFriendRequest: _sendingFriendRequest,
+        onSendFriendRequest: _sendFriendRequest,
+      );
+    }
+
+    if (widget.showAsTab) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+            child: Text('Hồ sơ của tôi', style: AppTextStyles.headlineMedium),
+          ),
+          Expanded(child: body),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Hồ sơ người chơi')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : _ProfileBody(profile: _profile!),
+      body: body,
     );
   }
 }
 
 class _ProfileBody extends StatelessWidget {
   final Map<String, dynamic> profile;
+  final bool isOwnProfile;
+  final String? friendMessage;
+  final bool sendingFriendRequest;
+  final VoidCallback onSendFriendRequest;
 
-  const _ProfileBody({required this.profile});
+  const _ProfileBody({
+    required this.profile,
+    this.isOwnProfile = false,
+    this.friendMessage,
+    required this.sendingFriendRequest,
+    required this.onSendFriendRequest,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -64,99 +161,156 @@ class _ProfileBody extends StatelessWidget {
     final losses = (profile['losses'] as num?)?.toInt() ?? 0;
     final draws = (profile['draws'] as num?)?.toInt() ?? 0;
     final total = wins + losses + draws;
-    final winRate = total > 0 ? (wins / total * 100).toStringAsFixed(1) : '0.0';
+    final winRate = total > 0 ? wins / total : 0.0;
+    final winRateLabel = '${(winRate * 100).toStringAsFixed(1)}%';
     final lastGames = profile['last_games'] as List<dynamic>? ?? [];
 
+    final stats = GameStats(
+        wins: wins, losses: losses, draws: draws, eloRating: elo, rank: rank);
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 48,
-            backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-            child: avatar.isEmpty
-                ? Text(
-                    username.isNotEmpty ? username[0].toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 32),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          Text(username,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  )),
-          const SizedBox(height: 8),
-          Text('$elo Elo  •  Hạng #$rank',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _Stat(label: 'Thắng', value: '$wins', color: Colors.green),
-              _Stat(label: 'Thua', value: '$losses', color: Colors.red),
-              _Stat(label: 'Hòa', value: '$draws', color: Colors.orange),
-              _Stat(
-                  label: 'Tỉ lệ thắng', value: '$winRate%', color: Colors.blue),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (lastGames.isNotEmpty) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('5 trận gần nhất',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      )),
+          // Avatar with Hero animation
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              children: [
+                Hero(
+                  tag: 'avatar_$username',
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
+                    backgroundImage:
+                        avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                    child: avatar.isEmpty
+                        ? Text(
+                            username.isNotEmpty
+                                ? username[0].toUpperCase()
+                                : '?',
+                            style: AppTextStyles.displayLarge
+                                .copyWith(color: AppColors.secondary),
+                          )
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(username, style: AppTextStyles.headlineMedium),
+                Text(
+                  '$elo Elo  •  Hạng #$rank',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: Colors.grey.shade600),
+                ),
+                if (!isOwnProfile) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    onPressed:
+                        sendingFriendRequest ? null : onSendFriendRequest,
+                    icon: sendingFriendRequest
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.person_add),
+                    label: const Text('Kết bạn'),
+                  ),
+                  if (friendMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: Text(friendMessage!),
+                    ),
+                ],
+              ],
             ),
-            const SizedBox(height: 8),
+          ),
+
+          // PlayerStatsCard for overview
+          PlayerStatsCard(
+            stats: stats,
+            username: username,
+            avatarUrl: avatar,
+          ),
+
+          // Win rate bar
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Tỉ lệ thắng',
+                        style: AppTextStyles.bodyMedium
+                            .copyWith(color: Colors.grey.shade600)),
+                    Text(winRateLabel,
+                        style: AppTextStyles.labelLarge
+                            .copyWith(color: Colors.green)),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+                  child: LinearProgressIndicator(
+                    value: winRate,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.green),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Last games section
+          if (lastGames.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('5 trận gần nhất', style: AppTextStyles.titleLarge),
+              ),
+            ),
             ...lastGames.take(5).map((g) {
               final game = g as Map<String, dynamic>;
               final result = game['result'] as String? ?? '';
               final opponent = game['opponent'] as String? ?? '';
               final date = game['date'] as String? ?? '';
-              return ListTile(
-                dense: true,
-                leading: Icon(
-                  result == 'win'
-                      ? Icons.emoji_events
-                      : result == 'loss'
-                          ? Icons.close
-                          : Icons.handshake,
-                  color: result == 'win'
-                      ? Colors.green
-                      : result == 'loss'
-                          ? Colors.red
-                          : Colors.orange,
+              Color rc = result == 'win'
+                  ? Colors.green
+                  : result == 'loss'
+                      ? Colors.red
+                      : Colors.orange;
+              IconData ri = result == 'win'
+                  ? Icons.emoji_events
+                  : result == 'loss'
+                      ? Icons.close
+                      : Icons.handshake;
+              return Card(
+                margin: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                child: ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: rc.withValues(alpha: 0.15),
+                    child: Icon(ri, color: rc, size: 16),
+                  ),
+                  title: Text('vs $opponent', style: AppTextStyles.bodyMedium),
+                  trailing: Text(date,
+                      style: AppTextStyles.labelSmall
+                          .copyWith(color: Colors.grey.shade600)),
                 ),
-                title: Text('vs $opponent'),
-                trailing: Text(date),
               );
             }),
+            const SizedBox(height: AppSpacing.xl),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _Stat({required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value,
-            style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 11)),
-      ],
     );
   }
 }

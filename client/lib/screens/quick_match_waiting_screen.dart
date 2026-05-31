@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/app_config.dart';
 import '../providers/game_provider.dart';
 import '../services/websocket_service.dart';
 
@@ -25,25 +26,31 @@ class _QuickMatchWaitingScreenState extends State<QuickMatchWaitingScreen> {
   void _onMessage(Map<String, dynamic> msg) {
     if (!mounted) return;
     final type = msg['type'] as String?;
-    if (type == 'quick_match_found') {
+    if (type == AppConfig.quickMatchFoundEvent) {
       final payload = msg['payload'] as Map<String, dynamic>? ?? {};
       context.read<GameProvider>().handleQuickMatchFound(payload);
       Navigator.pushReplacementNamed(context, '/online_game');
-    } else if (type == 'quick_match_timeout') {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Không tìm được đối thủ. Thử lại sau.')),
-        );
-        Navigator.pop(context);
-      }
+    } else if (type == AppConfig.quickMatchTimeoutEvent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm được đối thủ. Thử lại sau.')),
+      );
+      Navigator.pop(context);
+    } else if (type == AppConfig.quickMatchCancelledEvent) {
+      Navigator.pop(context);
+    } else if (type == AppConfig.errorEvent) {
+      final payload = msg['payload'] as Map<String, dynamic>? ?? {};
+      final code = payload['code'] as String?;
+      final message = code == 'email_not_verified'
+          ? 'Vui lòng xác minh email để chơi online'
+          : payload['message'] as String? ?? 'Không thể tìm đối thủ';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      Navigator.pop(context);
     }
   }
 
   void _cancel() {
-    context
-        .read<WebSocketService>()
-        .send({'type': 'quick_match_cancel', 'payload': {}});
+    context.read<WebSocketService>().cancelQuickMatch();
     Navigator.pop(context);
   }
 

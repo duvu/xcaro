@@ -2,7 +2,9 @@ import 'package:dio/dio.dart';
 import '../config/app_config.dart';
 import '../models/user.dart';
 import '../models/game.dart';
+import '../models/game_catalog.dart';
 import '../models/game_stats.dart';
+import '../models/dashboard_models.dart';
 
 class ApiService {
   final Dio _dio;
@@ -93,8 +95,58 @@ class ApiService {
 
   Future<User> getCurrentUser() async {
     try {
-      final response = await _dio.get('/users/profile');
+      final response = await _dio.get('/profile');
       return User.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<User> updateProfile({
+    required String fullName,
+    required String avatar,
+    DateTime? dateOfBirth,
+    required String phoneNumber,
+    required String bio,
+  }) async {
+    try {
+      await _dio.put('/profile', data: {
+        'full_name': fullName,
+        'avatar': avatar,
+        'date_of_birth': dateOfBirth?.toUtc().toIso8601String(),
+        'phone_number': phoneNumber,
+        'bio': bio,
+      });
+      return getCurrentUser();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.put('/profile/password', data: {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      });
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<User> updateEmail({
+    required String newEmail,
+    required String password,
+  }) async {
+    try {
+      await _dio.put('/profile/email', data: {
+        'new_email': newEmail,
+        'password': password,
+      });
+      return getCurrentUser();
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -115,7 +167,7 @@ class ApiService {
         'page': page,
         'limit': limit,
       };
-      if (userId != null) queryParams['userId'] = userId;
+      if (userId != null) queryParams['user_id'] = userId;
       final response = await _dio.get('/games', queryParameters: queryParams);
       return (response.data as List)
           .map((game) => Game.fromJson(game as Map<String, dynamic>))
@@ -125,19 +177,36 @@ class ApiService {
     }
   }
 
-  Future<GameStats> getGameStats(String userId) async {
+  Future<List<GameCatalogEntry>> getGameCatalog() async {
     try {
-      final response =
-          await _dio.get('/games/stats', queryParameters: {'userId': userId});
+      final response = await _dio.get(AppConfig.gameCatalogEndpoint);
+      final data = response.data as Map<String, dynamic>;
+      return (data['games'] as List<dynamic>? ?? const [])
+          .map(
+              (item) => GameCatalogEntry.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<GameStats> getGameStats(String userId, {String? gameType}) async {
+    try {
+      final response = await _dio.get('/games/stats', queryParameters: {
+        'user_id': userId,
+        if (gameType != null && gameType.isNotEmpty) 'game_type': gameType,
+      });
       return GameStats.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
-  Future<Map<String, dynamic>> getLeaderboard() async {
+  Future<Map<String, dynamic>> getLeaderboard({String? gameType}) async {
     try {
-      final resp = await _dio.get('/leaderboard');
+      final resp = await _dio.get('/leaderboard', queryParameters: {
+        if (gameType != null && gameType.isNotEmpty) 'game_type': gameType,
+      });
       return resp.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -148,6 +217,137 @@ class ApiService {
     try {
       final resp = await _dio.get('/users/$userId/profile');
       return resp.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<DashboardSummary> getDashboardSummary({String? gameType}) async {
+    try {
+      final response = await _dio.get('/dashboard/summary', queryParameters: {
+        if (gameType != null && gameType.isNotEmpty) 'game_type': gameType,
+      });
+      return DashboardSummary.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<DashboardHistoryResponse> getDashboardHistory({
+    int page = 1,
+    int limit = 20,
+    String? gameType,
+    String? result,
+    String? opponent,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    try {
+      final response = await _dio.get('/dashboard/history', queryParameters: {
+        'page': page,
+        'limit': limit,
+        if (gameType != null && gameType.isNotEmpty) 'game_type': gameType,
+        if (result != null && result.isNotEmpty) 'result': result,
+        if (opponent != null && opponent.isNotEmpty) 'opponent': opponent,
+        if (from != null) 'from': from.toUtc().toIso8601String(),
+        if (to != null) 'to': to.toUtc().toIso8601String(),
+      });
+      return DashboardHistoryResponse.fromJson(
+          response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<PlayerSummary>> searchPlayers({
+    String query = '',
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get('/social/players', queryParameters: {
+        'q': query,
+        'page': page,
+        'limit': limit,
+      });
+      final data = response.data as Map<String, dynamic>;
+      return (data['players'] as List<dynamic>? ?? const [])
+          .map((item) => PlayerSummary.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<FriendshipSummary>> getFriends() async {
+    try {
+      final response = await _dio.get('/social/friends');
+      final data = response.data as Map<String, dynamic>;
+      return (data['friends'] as List<dynamic>? ?? const [])
+          .map((item) =>
+              FriendshipSummary.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<FriendRequestSummary>> getFriendRequests(
+      {String box = 'incoming'}) async {
+    try {
+      final response = await _dio
+          .get('/social/friend-requests', queryParameters: {'box': box});
+      final data = response.data as Map<String, dynamic>;
+      return (data['requests'] as List<dynamic>? ?? const [])
+          .map((item) =>
+              FriendRequestSummary.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<FriendRequestSummary> sendFriendRequest(String recipientId) async {
+    try {
+      final response = await _dio.post('/social/friend-requests', data: {
+        'recipient_id': recipientId,
+      });
+      return FriendRequestSummary.fromJson(
+          response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<FriendshipSummary> acceptFriendRequest(String requestId) async {
+    try {
+      final response =
+          await _dio.post('/social/friend-requests/$requestId/accept');
+      return FriendshipSummary.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> rejectFriendRequest(String requestId) async {
+    try {
+      await _dio.post('/social/friend-requests/$requestId/reject');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> cancelFriendRequest(String requestId) async {
+    try {
+      await _dio.post('/social/friend-requests/$requestId/cancel');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> removeFriend(String userId) async {
+    try {
+      await _dio.delete('/social/friends/$userId');
     } on DioException catch (e) {
       throw _handleError(e);
     }

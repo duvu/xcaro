@@ -9,13 +9,28 @@ class AppConfig {
   static const String logoutEndpoint = '/auth/logout';
   static const String profileEndpoint = '/users/profile';
   static const String gamesEndpoint = '/games';
+  static const String gameCatalogEndpoint = '/games/catalog';
+  static const String defaultGameType = 'caro';
 
   // WebSocket events
+  static const String createRoomEvent = 'create_room';
   static const String joinRoomEvent = 'join_room';
+  static const String joinRoomByCodeEvent = 'join_room_by_code';
+  static const String rejoinRoomEvent = 'rejoin_room';
   static const String leaveRoomEvent = 'leave_room';
-  static const String moveEvent = 'move';
-  static const String chatEvent = 'chat';
+  static const String moveEvent = 'make_move';
+  static const String resignEvent = 'resign';
+  static const String chatEvent = 'chat_message';
+  static const String gameStateEvent = 'game_state';
   static const String gameOverEvent = 'game_over';
+  static const String quickMatchRequestEvent = 'quick_match_request';
+  static const String quickMatchFoundEvent = 'quick_match_found';
+  static const String quickMatchCancelEvent = 'quick_match_cancel';
+  static const String quickMatchCancelledEvent = 'quick_match_cancelled';
+  static const String quickMatchTimeoutEvent = 'quick_match_timeout';
+  static const String errorEvent = 'error';
+  static const String pingEvent = 'ping';
+  static const String pongEvent = 'pong';
 
   // Storage keys
   static const String tokenKey = 'auth_token';
@@ -32,8 +47,8 @@ class AppConfig {
   static const bool isDevelopment = true;
 
   // Cấu hình cho môi trường production
-  static String get productionApiBaseUrl => 'https://api.xcaro.com/api';
-  static String get productionWsBaseUrl => 'wss://api.xcaro.com/ws';
+  static String get productionApiBaseUrl => 'https://api.playverse.app/api';
+  static String get productionWsBaseUrl => 'wss://api.playverse.app/ws';
 
   // Lấy URL dựa vào môi trường
   static String get baseUrl =>
