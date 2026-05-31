@@ -1,10 +1,10 @@
-# XCaro Technical Documentation
+# PlayVerse Technical Documentation
 
-XCaro is a cross-platform Gomoku (Caro) application featuring real-time multiplayer capabilities, WebRTC-powered voice/video communication, and a high-performance backend. This document serves as the primary technical reference for developers, contributors, and maintainers.
+PlayVerse is a cross-platform Gomoku (Caro) application featuring real-time multiplayer capabilities, WebRTC-powered voice/video communication, and a high-performance backend. This document serves as the primary technical reference for developers, contributors, and maintainers.
 
 ## Project Overview
 
-XCaro combines a modern Flutter frontend with a robust Go backend to deliver a seamless gaming experience. It supports multiple game modes, including local PvP and player vs. computer (AI) matches, while providing a foundation for global online play.
+PlayVerse combines a modern Flutter frontend with a robust Go backend to deliver a seamless gaming experience. It supports multiple game modes, including local PvP and player vs. computer (AI) matches, while providing a foundation for global online play.
 
 ### Core Architecture
 
@@ -180,8 +180,8 @@ Messages use a JSON format:
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-repo/xcaro.git
-    cd xcaro
+    git clone https://github.com/your-repo/playverse.git
+    cd playverse
     ```
 
 2.  **Server Setup**:

@@ -1,4 +1,4 @@
-# XCaro Architecture
+# PlayVerse Architecture
 
 ## System Overview
 
@@ -28,6 +28,25 @@ online room coordination, persisted game records, Elo rating updates, and public
 leaderboard/profile data. MongoDB is the source of truth. Redis is an optional
 cache/rate-limit backend; if Redis is unavailable the server degrades gracefully.
 
+## Mini-Game Platform Direction
+
+PlayVerse now evolves as a one-app, one-server mini-game platform rather than a
+single-game product. The active migration keeps the existing Flutter shell,
+social/dashboard/history/leaderboard modules, and Go modular monolith, while
+introducing a shared `game_type` contract and a static game catalog that starts
+with `caro`.
+
+Boundary rules for this migration:
+
+- shared platform concerns stay in the shell/server platform layers: auth,
+  profile, dashboard, social, history, leaderboard, transport, matchmaking,
+  reconnect, and persistence orchestration;
+- game-specific rules move behind per-game modules, starting with a dedicated
+  Caro engine under `server/internal/games/caro`;
+- legacy clients that omit `game_type` continue to mean `caro`;
+- a second mini-game should be added only after Caro runs successfully through
+  the new platform contract.
+
 ## Flutter Client Architecture
 
 The active Flutter project is `client/`.
@@ -40,6 +59,7 @@ Key layers:
   - online game state
   - offline AI game state
   - leaderboard/profile state
+  - dashboard/social state
   - chat state
   - theme state
 - `lib/services/` wraps REST and WebSocket communication.
@@ -78,7 +98,7 @@ Startup flow:
 
 1. Load `.env` with `godotenv`.
 2. Connect to MongoDB from `MONGODB_URI`.
-3. Select database from `DB_NAME` (default `xcaro`).
+3. Select database from `DB_NAME` (default `playverse`).
 4. Initialize Redis cache from `REDIS_URL`.
 5. Create auth, game, WebSocket, and leaderboard handlers.
 6. Register Gin routes under `/api`.
@@ -99,9 +119,12 @@ Startup flow:
 - `internal/auth`: registration, login, refresh/logout, profile updates, admin
   user operations, email verification, JWT middleware.
 - `internal/game`: HTTP game endpoints, history/stats, game record retrieval.
+- `internal/games`: platform game catalog and shared game-type contract.
 - `internal/ws`: WebSocket Hub, Client, Room lifecycle, realtime moves, chat,
   resign/disconnect handling, game-over persistence.
 - `internal/leaderboard`: leaderboard cache, player profile, avatar update.
+- `internal/social`: dashboard summary/history BFF endpoints plus player
+  discovery, friend requests, and friendship management.
 - `internal/elo`: K=32 Elo calculation.
 - `internal/cache`: optional Redis client helpers.
 - `internal/middleware`: Redis-backed rate limiting.
@@ -115,7 +138,13 @@ Primary MongoDB collections:
   Elo rating, roles/permissions, avatar, ban status.
 - `games`: HTTP-created game documents.
 - `game_records`: completed online game records, moves, winner, duration,
-  Elo deltas, and timestamps.
+  `game_type`, Elo deltas, optional participant/rating metadata, and timestamps.
+- `user_game_ratings`: per-game rating documents keyed by `user_id` and
+  `game_type` for future non-Caro leaderboards.
+- `friend_requests`: pending/accepted/rejected/cancelled requests with
+  requester, recipient, normalized `pair_key`, status, and timestamps.
+- `friendships`: accepted normalized user pairs with unique `pair_key` and
+  timestamps for friend-list lookup/removal.
 
 Redis keys include:
 
@@ -150,8 +179,9 @@ Authorization: Bearer <access_token>
 
 ```json
 {
-  "type": "join_room",
-  "payload": {}
+  "type": "join_room_by_code",
+  "game_type": "caro",
+  "payload": { "code": "ABC123" }
 }
 ```
 
@@ -159,10 +189,15 @@ Authorization: Bearer <access_token>
 
 Client-to-server events currently handled:
 
-- `join_room`
+- `create_room`
+- `join_room_by_code`
+- `rejoin_room`
+- `leave_room`
+- `quick_match_request`
+- `quick_match_cancel`
 - `make_move`
 - `resign`
-- `game_move`
+- `game_move` (legacy compatibility only)
 - `chat_message`
 - `ping`
 
@@ -170,6 +205,9 @@ Server-to-client events currently emitted:
 
 - `game_state`
 - `game_over`
+- `quick_match_found`
+- `quick_match_cancelled`
+- `quick_match_timeout`
 - `player_join`
 - `player_leave`
 - `chat_message`
@@ -178,19 +216,50 @@ Server-to-client events currently emitted:
 
 ### Room Lifecycle
 
-1. Player creates a room or joins by room code.
+1. Player creates a room with `create_room` or joins by code with
+   `join_room_by_code`. Legacy clients may omit `game_type`, which defaults to
+   `caro`.
 2. Server assigns X/O symbols and broadcasts `game_state`.
 3. Players send `make_move`; server validates turn, occupancy, and game status.
 4. Server detects win/draw/resign/disconnect timeout.
-5. Server persists a `game_records` document and broadcasts `game_over`.
-6. Completed online non-forfeit games update Elo ratings.
+5. Server persists a `game_records` document tagged by `game_type` and
+   broadcasts `game_over`.
+6. Completed online games update Elo ratings, including resign/forfeit outcomes.
 
 Rooms expire after inactivity and disconnected players have a grace period before
 forfeit.
 
+## Dashboard And Social Boundary
+
+Dashboard and social management stay in the existing Go server as a modular
+monolith. This keeps registration, profile, history, leaderboard, and friendship
+data close to the existing MongoDB collections while avoiding a premature second
+deployable, database, or event bus.
+
+Boundary rules:
+
+- Dashboard/social APIs are authenticated REST routes under `/api/dashboard` and
+  `/api/social`.
+- The module may read `users`, `game_records`, `friend_requests`, and
+  `friendships` only through its own service/repository code.
+- It must not import or mutate `internal/ws` Hub/Room internals. Friend invites
+  or presence should be added through an explicit interface or event later.
+- Public discovery/profile summaries must not expose email, password hash,
+  refresh tokens, verification tokens, or ban internals.
+
+Future extraction criteria:
+
+- dashboard/social traffic or release cadence differs materially from gameplay;
+- a separate moderation/admin team needs independent ownership;
+- social graph storage/querying needs a different database or search backend;
+- compliance or privacy boundaries require separate deployment controls.
+
+Until one of those conditions is true, the modular-monolith boundary is the
+recommended architecture.
+
 ## Elo Rating System
 
-XCaro uses a standard K=32 Elo calculation:
+PlayVerse uses a standard K=32 Elo calculation:
 
 ```text
 expected = 1 / (1 + 10^((opponentRating - playerRating) / 400))
@@ -203,8 +272,8 @@ Scores:
 - draw: `0.5`
 - loss: `0.0`
 
-Elo is updated only for completed online games that are not resign/forfeit
-outcomes. Game records store `elo_delta_x` and `elo_delta_o`.
+Elo is updated for completed online games when both players are known. Game
+records store `elo_delta_x` and `elo_delta_o`.
 
 ## Operational Notes
 
@@ -212,6 +281,6 @@ outcomes. Game records store `elo_delta_x` and `elo_delta_o`.
   limiting fail open.
 - Email verification requires SMTP env vars. Without SMTP configuration,
   registration still creates the account, but verification email delivery fails.
-- The Docker Compose stack defines `mongodb`, `redis`, and `xcaro-server`.
+- The Docker Compose stack defines `mongodb`, `redis`, and `playverse-server`.
 - Swagger files exist under `server/docs/`, but this repository also keeps a
   handwritten API reference in `docs/api.md`.

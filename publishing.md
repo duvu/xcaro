@@ -19,7 +19,7 @@
 
 ### 1. Tạo keystore cho ứng dụng
 ```bash
-keytool -genkey -v -keystore android/app/xcaro-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias xcaro
+keytool -genkey -v -keystore android/app/playverse-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias playverse
 ```
 
 ### 2. Cập nhật thông tin keystore
@@ -27,9 +27,9 @@ Mở file `android/app/build.gradle`, thay đổi mật khẩu trong phần `sig
 ```gradle
 signingConfigs {
     release {
-        storeFile file("xcaro-key.jks")
+        storeFile file("playverse-key.jks")
         storePassword "mật_khẩu_của_bạn"
-        keyAlias "xcaro"
+        keyAlias "playverse"
         keyPassword "mật_khẩu_key_của_bạn"
     }
 }
@@ -61,13 +61,13 @@ File build sẽ nằm tại: `build/app/outputs/bundle/release/app-release.aab`
 3. Chọn "Runner" trong navigator
 4. Trong "Signing & Capabilities":
    - Chọn Team của bạn
-   - Cập nhật Bundle Identifier: `vn.x51.game2d.xcaro`
+   - Cập nhật Bundle Identifier: `vn.x51.game2d.playverse`
 
 ### 2. Build ứng dụng
 ```bash
 flutter build ipa
 ```
-File build sẽ nằm tại: `build/ios/ipa/xcaro.ipa`
+File build sẽ nằm tại: `build/ios/ipa/playverse.ipa`
 
 ### 3. Đăng ký ứng dụng trên App Store Connect
 1. Truy cập https://appstoreconnect.apple.com

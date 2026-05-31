@@ -13,7 +13,7 @@ const docTemplate = `{
         "contact": {
             "name": "API Support",
             "url": "http://www.swagger.io/support",
-            "email": "support@xcaro.com"
+            "email": "support@playverse.app"
         },
         "license": {
             "name": "MIT",
@@ -347,7 +347,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/api",
 	Schemes:          []string{"http", "https"},
-	Title:            "XCaro Game API",
+	Title:            "PlayVerse API",
 	Description:      "API cho game cờ caro online với tính năng chat và voice/video call.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

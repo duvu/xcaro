@@ -89,7 +89,7 @@ definitions:
 host: localhost:8080
 info:
   contact:
-    email: support@xcaro.com
+    email: support@playverse.app
     name: API Support
     url: http://www.swagger.io/support
   description: API cho game cờ caro online với tính năng chat và voice/video call.
@@ -97,7 +97,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
   termsOfService: http://swagger.io/terms/
-  title: XCaro Game API
+  title: PlayVerse API
   version: "1.0"
 paths:
   /auth/login:

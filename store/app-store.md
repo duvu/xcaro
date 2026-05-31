@@ -2,7 +2,7 @@
 
 ## Name
 
-XCaro – Gomoku Online
+PlayVerse – Gomoku Online
 
 ## Subtitle
 
@@ -10,11 +10,11 @@ Strategy Board Game
 
 ## Promotional Text
 
-Challenge friends in online Gomoku, practice vs AI, and climb the XCaro ranked leaderboard.
+Challenge friends in online Gomoku, practice vs AI, and climb the PlayVerse ranked leaderboard.
 
 ## Description
 
-XCaro is a modern mobile Gomoku/Caro game built for strategic five-in-a-row
+PlayVerse is a modern mobile Gomoku/Caro game built for strategic five-in-a-row
 matches. Play on a 15×15 board, alternate turns, and connect five stones in a
 row horizontally, vertically, or diagonally to win.
 
@@ -29,7 +29,7 @@ Compete through Elo-rated matches and compare your progress on the leaderboard.
 View player profiles, recent games, game history, and personal statistics as you
 improve.
 
-XCaro includes responsive board controls, animated stones, sound controls,
+PlayVerse includes responsive board controls, animated stones, sound controls,
 dark/light themes, and a first-launch tutorial so new players can start quickly.
 
 ## Keywords
@@ -38,8 +38,8 @@ gomoku,caro,board,strategy,multiplayer,ai,online,ranked
 
 ## Support URL
 
-https://github.com/<owner>/xcaro/issues
+https://github.com/<owner>/playverse/issues
 
 ## Privacy Policy URL
 
-https://example.com/xcaro/privacy
+https://example.com/playverse/privacy

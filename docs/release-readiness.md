@@ -1,4 +1,4 @@
-# XCaro Release Readiness Checklist
+# PlayVerse Release Readiness Checklist
 
 Use this checklist before merging or shipping an MVP release candidate. Each row
 must be marked `Pass`, `Fail`, or `N/A`, with evidence linked in
@@ -76,9 +76,9 @@ must be marked `Pass`, `Fail`, or `N/A`, with evidence linked in
 
 | Item | Status | Release Impact | Required Decision |
 |---|---|---|---|
-| Android application ID/package ownership | Owner decision needed | `client/android/app/build.gradle` uses `vn.x51.game2d.xcaro`; confirm it is the intended public package before store upload. | Product owner must approve or provide final ID before public store upload. |
-| Android release signing placeholders | Internal build accepted | Local release build falls back to debug signing when `xcaro-key.jks` is absent; artifact is not store-ready. | Provide signing config before Play Store/App Store release. |
-| Deployment host assumptions | Open | `.github/workflows/deploy.yml` assumes `~/xcaro` and `docker-compose` on the target host. | Release operator must provision target or update workflow. |
+| Android application ID/package ownership | Owner decision needed | `client/android/app/build.gradle` uses `vn.x51.game2d.playverse`; confirm it is the intended public package before store upload. | Product owner must approve or provide final ID before public store upload. |
+| Android release signing placeholders | Internal build accepted | Local release build falls back to debug signing when `playverse-key.jks` is absent; artifact is not store-ready. | Provide signing config before Play Store/App Store release. |
+| Deployment host assumptions | Open | `.github/workflows/deploy.yml` assumes `~/playverse` and `docker-compose` on the target host. | Release operator must provision target or update workflow. |
 | SMTP availability | Open | Real email verification smoke test requires SMTP credentials; without them only UI/API fallback can be validated. | Provide test SMTP credentials or accept documented limitation. |
 | Large PR scope | Open | PR includes broad MVP history and generated assets, increasing review risk. | Review by subsystem before merge. |
 

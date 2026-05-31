@@ -1,6 +1,6 @@
-# Contributing to XCaro
+# Contributing to PlayVerse
 
-Thanks for helping improve XCaro. This guide covers the local workflow, project
+Thanks for helping improve PlayVerse. This guide covers the local workflow, project
 layout, and quality checks expected before opening a pull request.
 
 ## Prerequisites

@@ -1,4 +1,4 @@
-# XCaro Game Server
+# PlayVerse Game Server
 
 Server game cờ caro được viết bằng Go, sử dụng Gin framework, MongoDB và WebSocket/WebRTC cho realtime communication.
 
@@ -72,53 +72,70 @@ server/
 
 3. **Realtime Communication**
    - WebSocket endpoint: `GET /api/ws`
-   - Kết nối: `ws://server:8080/api/ws?game_id=<game_id>&token=<jwt_token>`
+   - Kết nối: `ws://server:8080/api/ws?token=<jwt_token>` cho Flutter/native client, hoặc Bearer JWT qua header khi client hỗ trợ header WebSocket.
    - Tính năng:
+     - Tạo phòng online và tham gia bằng mã 6 ký tự
+     - Quick match giữa hai người chơi khác nhau
+     - Đồng bộ bàn cờ/lượt đi/kết quả bằng server-authoritative `game_state`
      - Chat text trong game
-     - Voice call (WebRTC)
-     - Video call (WebRTC)
-     - Cập nhật nước đi realtime
+     - Reconnect grace 30 giây trước khi xử thua do mất kết nối
      - Ping/Pong tự động (60s timeout)
 
 ## WebSocket Protocol
 
 ### Message Types
 
-1. **Move Message**
+1. **Create Room**
 ```json
 {
-  "type": "move",
+  "type": "create_room",
+  "payload": {}
+}
+```
+
+2. **Join Room By Code**
+```json
+{
+  "type": "join_room_by_code",
   "payload": {
-    "player_id": "string",
-    "row": "number",
-    "col": "number"
+    "code": "ABC123"
   }
 }
 ```
 
-2. **Chat Message**
+3. **Move Message**
 ```json
 {
-  "type": "chat",
+  "type": "make_move",
   "payload": {
-    "user_id": "string",
-    "username": "string",
-    "content": "string",
-    "timestamp": "number"
+    "x": 7,
+    "y": 7
   }
 }
 ```
 
-3. **WebRTC Signaling**
+4. **Quick Match / Cancel**
 ```json
 {
-  "type": "offer|answer|ice-candidate",
+  "type": "quick_match_request",
+  "payload": {}
+}
+```
+
+5. **Chat Message**
+```json
+{
+  "type": "chat_message",
   "payload": {
-    "user_id": "string",
-    "data": "object"
+    "content": "Xin chào"
   }
 }
 ```
+
+Server emits `game_state`, `game_over`, `quick_match_found`,
+`quick_match_cancelled`, `quick_match_timeout`, `chat_message`, `error`, and
+`pong`. See `../docs/WEBSOCKET_INTEGRATION.md` for the canonical payload shape
+and machine-readable error codes.
 
 ### WebRTC Configuration
 
@@ -138,7 +155,7 @@ const configuration = {
 ```bash
 # Clone dự án
 git clone <repository_url>
-cd xcaro
+cd playverse
 
 # Build và chạy với Docker Compose
 docker-compose up --build
@@ -152,7 +169,7 @@ Server sẽ chạy tại `http://localhost:8080`
    ```bash
    # Tạo user và database
    mongosh
-   use xcaro
+   use playverse
    db.createUser({
      user: "admin",
      pwd: "secret",
@@ -182,8 +199,8 @@ PORT=8080
 GIN_MODE=release      # release hoặc debug
 
 # MongoDB Configuration
-MONGODB_URI=mongodb://admin:secret@localhost:27017/xcaro?authSource=admin
-DB_NAME=xcaro
+MONGODB_URI=mongodb://admin:secret@localhost:27017/playverse?authSource=admin
+DB_NAME=playverse
 
 # JWT Configuration
 JWT_SECRET=your-secret-key
@@ -196,9 +213,8 @@ JWT_EXPIRATION=24h    # Thời gian hết hạn của token
 - Mật khẩu được mã hóa với bcrypt
 - Tất cả các API game đều yêu cầu xác thực
 - WebSocket connection được bảo vệ bằng JWT
-- WebRTC sử dụng mã hóa end-to-end cho voice/video call
-- CORS được cấu hình cho production
-- Rate limiting cho API endpoints (coming soon)
+- WebSocket query-token values are redacted from Gin access logs
+- CORS/rate limiting should be reviewed for production origins and traffic
 
 ## Xử lý lỗi và Logging
 

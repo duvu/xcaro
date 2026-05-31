@@ -1,4 +1,4 @@
-# XCaro Game
+# PlayVerse
 
 Game cờ caro đơn giản được viết bằng Flutter và Dart.
 
@@ -58,7 +58,7 @@ Configure these secrets in **Settings → Secrets and variables → Actions**:
 | `DEPLOY_HOST` | Hostname or IP of the deploy server |
 | `DEPLOY_USER` | SSH username on the deploy server |
 
-The deploy workflow SSHs into the server and runs `docker-compose pull && docker-compose up -d` in `~/xcaro/`.
+The deploy workflow SSHs into the server and runs `docker-compose pull && docker-compose up -d` in `~/playverse/`.
 
 ## Release Readiness
 

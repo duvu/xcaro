@@ -6,12 +6,12 @@
     "swagger": "2.0",
     "info": {
         "description": "API cho game cờ caro online với tính năng chat và voice/video call.",
-        "title": "XCaro Game API",
+        "title": "PlayVerse API",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "API Support",
             "url": "http://www.swagger.io/support",
-            "email": "support@xcaro.com"
+            "email": "support@playverse.app"
         },
         "license": {
             "name": "MIT",

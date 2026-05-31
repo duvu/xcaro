@@ -1,6 +1,6 @@
-# XCaro Product Roadmap
+# PlayVerse Product Roadmap
 
-This roadmap is a working reference for implementing XCaro gradually after the MVP foundation. Keep each phase small enough to review, test, and release independently.
+This roadmap is a working reference for implementing PlayVerse gradually after the MVP foundation. Keep each phase small enough to review, test, and release independently.
 
 ## Current State — Updated 2026-05-30
 
@@ -20,7 +20,7 @@ This roadmap is a working reference for implementing XCaro gradually after the M
 - Documentation: architecture, API reference, game rules, contribution guide
 - Store listing drafts (Play Store + App Store)
 - CI/CD GitHub Actions: PR check (go vet/test + flutter analyze/test) and deploy workflow (GHCR + SSH)
-- PR #1 open: https://github.com/duvu/xcaro/pull/1
+- PR #1 open: https://github.com/duvu/playverse/pull/1
 
 ### ✅ Phase 1: Stabilization and Release Readiness — COMPLETE
 
@@ -59,7 +59,7 @@ OpenSpec change: `phase-2-public-beta` (52/52 tasks)
 - [x] Player report endpoint (`POST /api/reports`, 3/hr per user, MongoDB `reports` collection)
 - [x] Crash/error tracking endpoint (`POST /api/errors`, 10/hr per IP, MongoDB `error_reports` collection)
 - [x] Quick match waiting screen (Flutter — `QuickMatchWaitingScreen`, 60s timeout, cancel)
-- [x] Room invite sharing with `share_plus` (deep-link `xcaro://room/<code>`)
+- [x] Room invite sharing with `share_plus` (deep-link `playverse://room/<code>`)
 - [x] Polished empty states and error states (`EmptyStateWidget`, `ErrorStateWidget` — leaderboard, home screen)
 - [x] WS connection status chip on home screen (StreamBuilder on `isConnectedStream`)
 - [x] Improved disconnect/resign/forfeit messaging (`game_over` result field mapped to Vietnamese strings)
@@ -124,7 +124,7 @@ OpenSpec change: `phase-2-public-beta` (52/52 tasks)
 
 ## Phase 5: Product Polish and Monetization Optionality
 
-**Goal:** prepare XCaro as a polished consumer app without compromising fair play.
+**Goal:** prepare PlayVerse as a polished consumer app without compromising fair play.
 
 ### Scope
 
